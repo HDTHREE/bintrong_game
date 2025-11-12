@@ -1,4 +1,8 @@
 # Team
+**10x Devs** :computer:
+
+## Members
+
 * Hayden Dennis - sole contributor
 
 ## Advisor
