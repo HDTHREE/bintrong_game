@@ -6,7 +6,9 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.121.1",
+    "httpx>=0.28.1",
     "pypdf>=6.2.0",
+    "python-dotenv>=1.2.1",
     "youtube-transcript-api>=1.2.3",
 ]
 

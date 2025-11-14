@@ -7,7 +7,7 @@
     "build": "webpack --mode production",
     "get-grok": "uvx huggingface-cli download xai-org/grok-2 --local-dir ./models/grok-2",
     "build-slang": "docker build -t grok2-sglang:fp8-tp8 .",
-    "run-slang": "docker run -v ./models/grok-2:/local/grok-2:ro grok2-sglang:fp8-tp8"
+    "run-slang": "docker run -p 4084:4084 -v ./models/grok-2:/local/grok-2:ro grok2-sglang:fp8-tp8"
   },
   "author": "HDTHREE",
   "dependencies": {
