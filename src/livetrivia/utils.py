@@ -4,7 +4,7 @@ import functools as fnt
 import logging
 
 
-__all__: tuple[str] = ("retry_with_backoff",)
+__all__: tuple[str] = ("retry_with_backoff", "ENV_ARGS")
 
 
 ENV_ARGS: tuple[str] = (

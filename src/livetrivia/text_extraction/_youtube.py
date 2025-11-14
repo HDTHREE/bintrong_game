@@ -1,7 +1,7 @@
 import youtube_transcript_api as yt
 import os
 import threading
-from utils import retry_with_backoff, ENV_ARGS
+from livetrivia.utils import retry_with_backoff, ENV_ARGS
 
 
 api: yt.YouTubeTranscriptApi = yt.YouTubeTranscriptApi()
