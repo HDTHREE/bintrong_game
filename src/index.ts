@@ -1,2 +1,3 @@
-import "./main.ts";
+// prettier-ignore
+import './main.ts';
 

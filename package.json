@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "webpack serve",
     "build": "webpack --mode production",
+    "lint": "xo --fix && uvx ruff check && uvx ruff format",
     "get-grok": "uvx huggingface-cli download xai-org/grok-2 --local-dir ./models/grok-2",
     "build-slang": "docker build -t grok2-sglang:fp8-tp8 .",
     "run-slang": "docker run -p 4084:4084 -v ./models/grok-2:/local/grok-2:ro grok2-sglang:fp8-tp8"
@@ -12,14 +13,18 @@
   "author": "HDTHREE",
   "dependencies": {
     "@types/three": "^0.181.0",
-    "copy-webpack-plugin": "^13.0.1",
-    "html-webpack-plugin": "^5.6.4",
-    "three": "^0.181.1",
-    "ts-loader": "^9.5.4",
-    "webpack": "^5.102.1"
+    "three": "^0.181.1"
   },
   "devDependencies": {
+    "copy-webpack-plugin": "^13.0.1",
+    "html-webpack-plugin": "^5.6.4",
+    "ts-loader": "^9.5.4",
+    "webpack": "^5.102.1",
     "webpack-cli": "^6.0.1",
-    "webpack-dev-server": "^5.2.2"
+    "webpack-dev-server": "^5.2.2",
+    "xo": "^1.2.3"
+  },
+  "xo": {
+    "ignores": ["webpack.config.js", "src/**/index.{js,ts,jsx,tsx}"]
   }
 }
