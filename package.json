@@ -1,0 +1,22 @@
+{
+  "name": "livetrivia",
+  "version": "0.0.0",
+  "main": "index.js",
+  "scripts": {
+    "dev": "webpack serve",
+    "build": "webpack --mode production"
+  },
+  "author": "HDTHREE",
+  "dependencies": {
+    "@types/three": "^0.181.0",
+    "copy-webpack-plugin": "^13.0.1",
+    "html-webpack-plugin": "^5.6.4",
+    "three": "^0.181.1",
+    "ts-loader": "^9.5.4",
+    "webpack": "^5.102.1"
+  },
+  "devDependencies": {
+    "webpack-cli": "^6.0.1",
+    "webpack-dev-server": "^5.2.2"
+  }
+}
