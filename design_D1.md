@@ -1,0 +1,13 @@
+```mermaid
+flowchart LR
+    A(Students) --> D(Connects to game) --> E(Application)
+    C(Creates Game) --> E
+    B(Teacher) --> I(Creates Account)
+    B --> J(Log into Account)
+    I --> J
+    J --> C
+    E --> DB(Database)
+    E --> S3(S3 Bucket)
+
+```
+
