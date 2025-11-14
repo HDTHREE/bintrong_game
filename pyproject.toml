@@ -5,11 +5,27 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "fastapi>=0.121.1",
     "httpx>=0.28.1",
     "pypdf>=6.2.0",
     "python-dotenv>=1.2.1",
+    "sqlmodel>=0.0.27",
     "youtube-transcript-api>=1.2.3",
+]
+
+[project.optional-dependencies]
+backend = [
+    "fastapi>=0.121.1",
+    "gunicorn>=23.0.0",
+    "sqlalchemy[asyncio]>=2.0.44",
+]
+frontend = [
+    "dash-ag-grid>=32.3.2",
+    "dash-extensions>=2.0.4",
+    "dash-iconify>=0.1.2",
+    "dash-mantine-components>=2.4.0",
+]
+dev = [
+    "ruff>=0.14.5",
 ]
 
 [build-system]

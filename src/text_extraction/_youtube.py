@@ -1,14 +1,20 @@
 import youtube_transcript_api as yt
-from utils import retry_with_backoff
+import os
+import threading
+from utils import retry_with_backoff, ENV_ARGS
 
 
 api: yt.YouTubeTranscriptApi = yt.YouTubeTranscriptApi()
 
 
-@retry_with_backoff() # TODO args
+@retry_with_backoff(
+    **{arg: os.getenv(arg) for arg in ENV_ARGS if os.getenv(arg)},
+    exceptions_to_catch=yt.YouTubeTranscriptApiException,
+    logger=getattr(threading.local(), "LOGGER", None),
+)
 def _get_youtube_transcript(url: str) -> str:
     *_, id = url.strip().split("https://www.youtube.com/watch?v=")
-    data: list[dict[str, str|float]] = api.fetch(id).to_raw_data()
+    data: list[dict[str, str | float]] = api.fetch(id).to_raw_data()
     return " ".join(map(lambda d: d["text"], data)).strip()
 
 

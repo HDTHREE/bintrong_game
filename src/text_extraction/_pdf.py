@@ -6,7 +6,7 @@ from pathlib import Path
 def _get_pdf_text(
     f: str | Path | tp.IO,
     page_range: tuple[int, int] | None = None,
-    password: str | None = None
+    password: str | None = None,
 ) -> str:
     reader: pdf.PdfReader = pdf.PdfReader(f, password=password)
     pages: list[pdf.PageObject] = reader.pages
@@ -22,6 +22,3 @@ if __name__ == "__main__":
     module_file_path = os.path.abspath(__file__)
     file_path = Path(module_file_path).parent / "file.pdf"
     print(_get_pdf_text(file_path))
-
-
-    
