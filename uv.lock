@@ -446,17 +446,17 @@ source = { editable = "." }
 dependencies = [
     { name = "httpx" },
     { name = "lazy-loader" },
-    { name = "pypdf" },
     { name = "python-dotenv" },
     { name = "sqlmodel" },
-    { name = "youtube-transcript-api" },
 ]
 
 [package.optional-dependencies]
 backend = [
     { name = "fastapi" },
     { name = "gunicorn" },
+    { name = "pypdf" },
     { name = "sqlalchemy", extra = ["asyncio"] },
+    { name = "youtube-transcript-api" },
 ]
 dev = [
     { name = "dash-ag-grid" },
@@ -465,14 +465,20 @@ dev = [
     { name = "dash-mantine-components" },
     { name = "fastapi" },
     { name = "gunicorn" },
+    { name = "pypdf" },
     { name = "ruff" },
     { name = "sqlalchemy", extra = ["asyncio"] },
+    { name = "uvicorn" },
+    { name = "youtube-transcript-api" },
 ]
 frontend = [
     { name = "dash-ag-grid" },
     { name = "dash-extensions" },
     { name = "dash-iconify" },
     { name = "dash-mantine-components" },
+]
+prod = [
+    { name = "gunicorn" },
 ]
 
 [package.metadata]
@@ -483,17 +489,19 @@ requires-dist = [
     { name = "dash-mantine-components", marker = "extra == 'frontend'", specifier = ">=2.4.0" },
     { name = "fastapi", marker = "extra == 'backend'", specifier = ">=0.121.1" },
     { name = "gunicorn", marker = "extra == 'backend'", specifier = ">=23.0.0" },
+    { name = "gunicorn", marker = "extra == 'prod'", specifier = ">=23.0.0" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "lazy-loader", specifier = ">=0.4" },
     { name = "livetrivia", extras = ["backend", "frontend"], marker = "extra == 'dev'" },
-    { name = "pypdf", specifier = ">=6.2.0" },
+    { name = "pypdf", marker = "extra == 'backend'", specifier = ">=6.2.0" },
     { name = "python-dotenv", specifier = ">=1.2.1" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.14.5" },
     { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'backend'", specifier = ">=2.0.44" },
     { name = "sqlmodel", specifier = ">=0.0.27" },
-    { name = "youtube-transcript-api", specifier = ">=1.2.3" },
+    { name = "uvicorn", marker = "extra == 'dev'", specifier = ">=0.38.0" },
+    { name = "youtube-transcript-api", marker = "extra == 'backend'", specifier = ">=1.2.3" },
 ]
-provides-extras = ["backend", "frontend", "dev"]
+provides-extras = ["backend", "frontend", "dev", "prod"]
 
 [[package]]
 name = "markupsafe"
@@ -876,6 +884,19 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/15/22/9ee70a2574a4f4599c47dd506532914ce044817c7752a79b6a51286319bc/urllib3-2.5.0.tar.gz", hash = "sha256:3fc47733c7e419d4bc3f6b3dc2b4f890bb743906a30d56ba4a5bfa4bbff92760", size = 393185, upload-time = "2025-06-18T14:07:41.644Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a7/c2/fe1e52489ae3122415c51f387e221dd0773709bad6c6cdaa599e8a2c5185/urllib3-2.5.0-py3-none-any.whl", hash = "sha256:e6b01673c0fa6a13e374b50871808eb3bf7046c4b125b216f6bf1cc604cff0dc", size = 129795, upload-time = "2025-06-18T14:07:40.39Z" },
+]
+
+[[package]]
+name = "uvicorn"
+version = "0.38.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "click" },
+    { name = "h11" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/cb/ce/f06b84e2697fef4688ca63bdb2fdf113ca0a3be33f94488f2cadb690b0cf/uvicorn-0.38.0.tar.gz", hash = "sha256:fd97093bdd120a2609fc0d3afe931d4d4ad688b6e75f0f929fde1bc36fe0e91d", size = 80605, upload-time = "2025-10-18T13:46:44.63Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ee/d9/d88e73ca598f4f6ff671fb5fde8a32925c2e08a637303a1d12883c7305fa/uvicorn-0.38.0-py3-none-any.whl", hash = "sha256:48c0afd214ceb59340075b4a052ea1ee91c16fbc2a9b1469cca0e54566977b02", size = 68109, upload-time = "2025-10-18T13:46:42.958Z" },
 ]
 
 [[package]]

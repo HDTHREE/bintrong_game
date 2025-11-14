@@ -7,10 +7,8 @@ requires-python = ">=3.12"
 dependencies = [
     "httpx>=0.28.1",
     "lazy-loader>=0.4",
-    "pypdf>=6.2.0",
     "python-dotenv>=1.2.1",
     "sqlmodel>=0.0.27",
-    "youtube-transcript-api>=1.2.3",
 ]
 
 [project.optional-dependencies]
@@ -18,6 +16,8 @@ backend = [
     "fastapi>=0.121.1",
     "gunicorn>=23.0.0",
     "sqlalchemy[asyncio]>=2.0.44",
+    "pypdf>=6.2.0",
+    "youtube-transcript-api>=1.2.3",
 ]
 frontend = [
     "dash-ag-grid>=32.3.2",
@@ -28,6 +28,10 @@ frontend = [
 dev = [
     "ruff>=0.14.5",
     "livetrivia[backend,frontend]",
+    "uvicorn>=0.38.0",
+]
+prod = [
+    "gunicorn>=23.0.0",
 ]
 
 [build-system]
