@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 try:
     from dotenv import load_dotenv
 
@@ -22,3 +23,9 @@ __all__: tuple[str] = ("api",)
 @api.get("/")
 async def root():
     return {"message": "Hello World"}
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(api)

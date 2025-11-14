@@ -1,4 +1,4 @@
-from ._app import _app as app
+from ._app import app as app
 
 
 __all__: tuple[str] = ("app",)
