@@ -38,3 +38,5 @@ prod = [
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
+[tool.uv.pip]
+all-extras = true
