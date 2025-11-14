@@ -1,7 +1,10 @@
-import typing as tp
 import time
 import functools as fnt
-import logging
+import typing_extensions as tp
+import importlib
+
+if tp.TYPE_CHECKING:
+    import logging
 
 
 __all__: tuple[str] = ("retry_with_backoff", "ENV_ARGS")
@@ -19,7 +22,7 @@ def retry_with_backoff(
     initial_delay: int = 1,
     backoff_factor: int = 2,
     exceptions_to_catch: tuple[Exception, ...] | Exception = (Exception,),
-    logger: logging.Logger | None | bool = False,
+    logger: "logging.Logger | None | bool" = False,
 ):
     def decorator(func: tp.Callable):
         @fnt.wraps(func)
@@ -41,3 +44,12 @@ def retry_with_backoff(
         return wrapper
 
     return decorator
+
+
+def load_pages() -> None:
+    importlib.import_module("livetrivia._fe_app.pages")
+
+
+def getmod(dunder_name: str) -> str:
+    *_, mod = dunder_name.split(".")
+    return mod

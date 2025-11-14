@@ -13,13 +13,12 @@ from fastapi import FastAPI
 SGLANG_URL: str | tp.Never = os.environ.get("SGLANG_URL", None) or exit()
 
 
-app: FastAPI = FastAPI()
+api: FastAPI = FastAPI()
 
 
+__all__: tuple[str] = ("api",)
 
-__all__: tuple[str] = ("app",)
 
-
-@app.get("/")
+@api.get("/")
 async def root():
     return {"message": "Hello World"}
