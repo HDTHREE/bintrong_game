@@ -28,7 +28,7 @@ module.exports = {
 			template: './public/index.html',
 		}),
 		new CopyPlugin({
-			patterns: [{from: 'public', to: '.', globOptions: {ignore: ['**/index.html']}}],
+			patterns: [{from: 'public', to: '.', globOptions: {ignore: ['**/index.html', '**/*.dash.js']}}],
 		}),
 	],
 	output: {
