@@ -9,12 +9,24 @@ finally:
 import os
 import typing_extensions as tp
 from fastapi import FastAPI
+from contextlib import asynccontextmanager
+from sqlmodel import SQLModel, create_engine
+from sqlalchemy.engine import Engine
 
 
-SGLANG_URL: str | tp.Never = os.environ.get("SGLANG_URL", None) or exit()
+
+SGLANG_URL, SQLITE_URL = map(lambda prop: os.getenv(prop) or exit(code=1), ("SGLANG_URL", "SQLITE_URL", ))
 
 
-api: FastAPI = FastAPI()
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> tp.AsyncGenerator[None, None, None]:
+    global SQLITE_URL
+    engine: Engine = create_engine(SQLITE_URL)
+    SQLModel.metadata.create_all(engine)
+    yield
+
+
+api: FastAPI = FastAPI(lifespan=lifespan)
 
 
 __all__: tuple[str] = ("api",)
