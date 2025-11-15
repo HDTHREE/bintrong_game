@@ -30,6 +30,7 @@ def retry_with_backoff[P: dict[str, tp.Any], R: tp.Any](
         tp.Callable[[tp.Unpack[P]], R | tp.Awaitable[R]],
     ]
 ):
+    backoff_factor = max(1.0, backoff_factor)
     def decorator[T: tp.Callable[[tp.Unpack[P]], R | tp.Awaitable[R]]](func: T) -> T:
         def _make_sync_wrapper(func: T) -> T:
             @fnt.wraps(func)
