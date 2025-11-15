@@ -14,8 +14,13 @@ from sqlmodel import SQLModel, create_engine
 from sqlalchemy.engine import Engine
 
 
-
-SGLANG_URL, SQLITE_URL = map(lambda prop: os.getenv(prop) or exit(code=1), ("SGLANG_URL", "SQLITE_URL", ))
+SGLANG_URL, SQLITE_URL = map(
+    lambda prop: os.getenv(prop) or exit(code=1),
+    (
+        "SGLANG_URL",
+        "SQLITE_URL",
+    ),
+)
 
 
 @asynccontextmanager

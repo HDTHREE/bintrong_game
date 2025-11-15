@@ -24,6 +24,7 @@ frontend = [
     "dash-extensions>=2.0.4",
     "dash-iconify>=0.1.2",
     "dash-mantine-components>=2.4.0",
+    "dash[async]>=3.3.0",
 ]
 dev = [
     "ruff>=0.14.5",
