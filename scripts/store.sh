@@ -1,3 +1,4 @@
+#!/bin/bash
 docker run --rm -d \
   --name localstack \
   -p 4566:4566 \

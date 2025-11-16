@@ -1,3 +1,4 @@
+#!/bin/bash
 docker run -d \
   --name sqlite-db \
   -v sqlite-data:/data \
