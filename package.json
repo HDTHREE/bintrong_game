@@ -6,7 +6,7 @@
     "dev": "webpack serve",
     "build": "webpack --mode production",
     "lint": "xo --fix && uvx ruff check && uvx ruff format",
-    "get-mistral": "mkdir -p models/mistral-7b && uvx huggingface-cli download mistralai/Mistral-7B-Instruct-v0.3 --local-dir ./models/mistral-7b",
+    "get-mistral": "mkdir -p models/mistral-7b && uvx --from huggingface_hub hf download mistralai/Mistral-7B-Instruct-v0.3 --local-dir ./models/mistral-7b",
     "build-slang": "docker build -f Dockerfile.sglang -t mistral-7b-sglang:fp8-tp8 .",
     "spawn-slang": "docker run -p 30000:4084 -v ./models/mistral-7b:/local/mistral-7b:ro --gpus all --shm-size=1g mistral-7b-sglang:fp8-tp8",
     "spawn-sqlite": "./scripts/sqlite.sh",

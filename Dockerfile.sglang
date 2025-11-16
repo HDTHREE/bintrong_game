@@ -11,12 +11,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libssl-dev libffi-dev \
     && rm -rf /var/lib/apt/lists/*
 
-RUN ln -s /usr/bin/python3 /usr/bin/python
 
-ARG SGLANG_VERSION=0.4.2
+ARG SGLANG_VERSION=0.5.5
 RUN pip install --no-cache-dir \
     "sglang[srt]==${SGLANG_VERSION}" \
-    torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+    torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu124
 
 EXPOSE 30000
 
