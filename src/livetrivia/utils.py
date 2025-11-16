@@ -1,5 +1,8 @@
+import os
 import time
+import inspect
 import functools as fnt
+import types
 import typing_extensions as tp
 import importlib
 import asyncio
@@ -31,6 +34,7 @@ def retry_with_backoff[P: dict[str, tp.Any], R: tp.Any](
     ]
 ):
     backoff_factor = max(1.0, backoff_factor)
+
     def decorator[T: tp.Callable[[tp.Unpack[P]], R | tp.Awaitable[R]]](func: T) -> T:
         def _make_sync_wrapper(func: T) -> T:
             @fnt.wraps(func)
@@ -91,3 +95,32 @@ def load_pages() -> None:
 def getmod(dunder_name: str) -> str:
     *_, mod = dunder_name.split(".")
     return mod
+
+
+def getenvs() -> tuple[str, ...] | str:
+    frame = inspect.currentframe()
+    label: tuple[str, ...] | str | None = None
+    try:
+        caller_frame: types.FrameType = frame.f_back
+        lines, line_number = inspect.getsourcelines(caller_frame)
+        current_line: str = lines[caller_frame.f_lineno - line_number - 1]
+        assignment: str = current_line.strip()
+        if "=" in assignment and "getenvs()" in assignment:
+            label, *_ = assignment.split("=")
+        if ", " in label:
+            label = tuple(label.replace(" ", "").split(","))
+        else:
+            label = (label.strip(),)
+    finally:
+        del frame
+
+    if "*_" in label:
+        raise RuntimeError(f"Cannot call `getenv` on line with {label=}")
+
+    return tuple(
+        map(
+            lambda v: os.getenv(v)
+            or (print(f"Cannot find env variable {v}") and exit(1)),
+            label,
+        )
+    )

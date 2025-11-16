@@ -6,25 +6,19 @@ try:
 finally:
     ...
 
-import os
 import typing_extensions as tp
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from sqlmodel import SQLModel, create_engine
 from sqlalchemy.engine import Engine
+from livetrivia.utils import getenvs
 
 
-SGLANG_URL, SQLITE_URL = map(
-    lambda prop: os.getenv(prop) or exit(code=1),
-    (
-        "SGLANG_URL",
-        "SQLITE_URL",
-    ),
-)
+SGLANG_URL, SQLITE_URL = getenvs()
 
 
 @asynccontextmanager
-async def lifespan(_: FastAPI) -> tp.AsyncGenerator[None, None, None]:
+async def lifespan(_: FastAPI) -> tp.AsyncGenerator[None, None]:
     global SQLITE_URL
     engine: Engine = create_engine(SQLITE_URL)
     SQLModel.metadata.create_all(engine)
