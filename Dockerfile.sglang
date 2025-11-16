@@ -18,15 +18,14 @@ RUN pip install --no-cache-dir \
     "sglang[srt]==${SGLANG_VERSION}" \
     torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
 
-EXPOSE 4084
+EXPOSE 30000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:4084/v1/models || exit 1
+    CMD curl -f http://localhost:30000/v1/models || exit 1
 
 CMD ["python3", "-m", "sglang.launch_server", \
-     "--model", "/local/grok-2", \
-     "--tokenizer-path", "/local/grok-2/tokenizer.tok.json", \
-     "--tp", "8", \
+     "--model", "/local/mistral-7b", \
+     "--tp", "1", \
      "--quantization", "fp8", \
      "--attention-backend", "triton", \
      "--host", "0.0.0.0", \
