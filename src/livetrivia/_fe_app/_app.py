@@ -4,6 +4,7 @@ import dash_extensions.pages as dep
 from dash import html, dcc, page_container, page_registry
 import dash_mantine_components as dmc
 from livetrivia.utils import load_pages
+from dash import set_props
 
 
 app: dee.DashProxy = dee.DashProxy(

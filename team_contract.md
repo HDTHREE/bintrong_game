@@ -6,7 +6,6 @@
 * Hayden Dennis - sole contributor
 
 ## Advisor
-* Justin Lastraps
 * Austin Coontz
 
 # Timing
