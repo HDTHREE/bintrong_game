@@ -2,11 +2,13 @@ import os
 import time
 import inspect
 import functools as fnt
-import types
 import typing_extensions as tp
+import types
 import importlib
 import asyncio
+import itertools as itt
 import logging
+import pydoc as pdc
 
 
 __all__: tuple[str] = ("retry_with_backoff", "ENV_ARGS")
@@ -22,7 +24,9 @@ ENV_ARGS: tuple[str] = (
 
 def _log_wrap(msg: tp.Any, logger: logging.Logger | None | bool = False) -> None:
     isinstance(logger, logging.Logger) and logger.debug(msg)
-    isinstance(logger, bool) and logger and print(msg)
+    if isinstance(logger, bool):
+        logger and print(msg)
+        return
     if logger is not None:
         raise ValueError(f"Invalid logger input was provided. {msg}")
 
@@ -101,7 +105,7 @@ def getmod(dunder_name: str) -> str:
     return mod
 
 
-def getenvs(strict: bool = True, logger: logging.Logger | None | bool = False) -> tuple[str, ...] | str:
+def getenvs[T: tp.Any](strict: bool = True, logger: logging.Logger | None | bool = True) -> tuple[T, ...] | T:
     frame = inspect.currentframe()
     labels: tuple[str, ...] | str | None = None
     try:
@@ -109,39 +113,46 @@ def getenvs(strict: bool = True, logger: logging.Logger | None | bool = False) -
         lines, line_number = inspect.getsourcelines(caller_frame)
         current_line: str = lines[caller_frame.f_lineno - line_number - 1]
         assignment: str = current_line.strip()
-        if "=" in assignment and "getenvs()" in assignment:
-            labels, *_ = assignment.split("=")
-        if ", " in labels:
+        if "=" in assignment and "getenvs" in assignment:
+            labels, call = assignment.split("=")
+        if labels and ", " in labels:
             labels = tuple(labels.replace(" ", "").split(","))
-        else:
+        elif labels:
             labels = (labels.strip(),)
+        else:
+            return None
     finally:
         del frame
 
     if "*_" in labels:
         raise RuntimeError("Cannot call `getenv` on line with `'*_'`")
     
-    # TODO seperate the type from the everything else. Then parse the value into the type.
+    labels, *types_ = tuple(zip(*map(lambda s: s.replace(" ", "").split(":"), labels)))
+    if types_:
+        types_, *_ = types_
+
+    if len(labels) == 1:
+        types_: tuple[type] = tuple(map(pdc.locate, types_))
+    elif len(types_):
+        raise AssertionError("Something went wrong")
+    else:
+        ...
+        # TODO Implement real generic support via class decorator so multitype can be specified
 
     values = tuple(map(os.getenv, labels))
-    none_values = tuple(label for (value, label) in zip(values, labels) if value is None)
+
+    none_values: tuple[str, ...] = tuple(label for (value, label, type_) in zip(values, labels, types_) if value is None or type_ is None)
 
     if none_values:
         first, *rest = none_values
         _log_wrap(msg=f"Cannot find env variable(s): {first} {", ".join(rest)}", logger=logger)
         strict and exit(1)
+    
+    values = tuple(itt.starmap(lambda t, d: t(d), zip(types_, values)))
 
     if len(values) == 1:
         values, *_ = values
         return values
     
     return values
-    
 
-
-
-if __name__ == "__main__":
-    os.environ["LABEL"] = "value"
-
-    LABEL: str = getenvs()
-    print(LABEL)
