@@ -19,6 +19,14 @@ ENV_ARGS: tuple[str] = (
 )
 
 
+
+def _log_wrap(msg: tp.Any, logger: logging.Logger | None | bool = False) -> None:
+    isinstance(logger, logging.Logger) and logger.debug(msg)
+    isinstance(logger, bool) and logger and print(msg)
+    if logger is not None:
+        raise ValueError(f"Invalid logger input was provided. {msg}")
+
+
 def retry_with_backoff[P: dict[str, tp.Any], R: tp.Any](
     max_attempts: int = 3,
     initial_delay: int | float = 1,
@@ -44,9 +52,7 @@ def retry_with_backoff[P: dict[str, tp.Any], R: tp.Any](
                     try:
                         return func(*args, **kwargs)
                     except exceptions_to_catch as e:
-                        msg: str = f"Attempt {attempt} failed: {e}. Retrying in {delay:.2f} seconds..."
-                        isinstance(logger, logging.Logger) and logger.debug(msg)
-                        isinstance(logger, bool) and logger and print(msg)
+                        _log_wrap(msg=f"Attempt {attempt} failed: {e}. Retrying in {delay:.2f} seconds...", logger=logger) # TODO This can be background in an async application
                         if attempt < max_attempts:
                             time.sleep(delay)
                             delay *= backoff_factor
@@ -63,9 +69,7 @@ def retry_with_backoff[P: dict[str, tp.Any], R: tp.Any](
                     try:
                         return await func(*args, **kwargs)
                     except exceptions_to_catch as e:
-                        msg: str = f"Attempt {attempt} failed: {e}. Retrying in {delay:.2f} seconds..."
-                        isinstance(logger, logging.Logger) and logger.debug(msg)
-                        isinstance(logger, bool) and logger and print(msg)
+                        _log_wrap(msg=f"Attempt {attempt} failed: {e}. Retrying in {delay:.2f} seconds...", logger=logger)
                         if attempt < max_attempts:
                             await asyncio.sleep(delay)
                             delay *= backoff_factor
@@ -97,30 +101,47 @@ def getmod(dunder_name: str) -> str:
     return mod
 
 
-def getenvs() -> tuple[str, ...] | str:
+def getenvs(strict: bool = True, logger: logging.Logger | None | bool = False) -> tuple[str, ...] | str:
     frame = inspect.currentframe()
-    label: tuple[str, ...] | str | None = None
+    labels: tuple[str, ...] | str | None = None
     try:
         caller_frame: types.FrameType = frame.f_back
         lines, line_number = inspect.getsourcelines(caller_frame)
         current_line: str = lines[caller_frame.f_lineno - line_number - 1]
         assignment: str = current_line.strip()
         if "=" in assignment and "getenvs()" in assignment:
-            label, *_ = assignment.split("=")
-        if ", " in label:
-            label = tuple(label.replace(" ", "").split(","))
+            labels, *_ = assignment.split("=")
+        if ", " in labels:
+            labels = tuple(labels.replace(" ", "").split(","))
         else:
-            label = (label.strip(),)
+            labels = (labels.strip(),)
     finally:
         del frame
 
-    if "*_" in label:
-        raise RuntimeError(f"Cannot call `getenv` on line with {label=}")
+    if "*_" in labels:
+        raise RuntimeError("Cannot call `getenv` on line with `'*_'`")
+    
+    # TODO seperate the type from the everything else. Then parse the value into the type.
 
-    return tuple(
-        map(
-            lambda v: os.getenv(v)
-            or (print(f"Cannot find env variable {v}") and exit(1)),
-            label,
-        )
-    )
+    values = tuple(map(os.getenv, labels))
+    none_values = tuple(label for (value, label) in zip(values, labels) if value is None)
+
+    if none_values:
+        first, *rest = none_values
+        _log_wrap(msg=f"Cannot find env variable(s): {first} {", ".join(rest)}", logger=logger)
+        strict and exit(1)
+
+    if len(values) == 1:
+        values, *_ = values
+        return values
+    
+    return values
+    
+
+
+
+if __name__ == "__main__":
+    os.environ["LABEL"] = "value"
+
+    LABEL: str = getenvs()
+    print(LABEL)
