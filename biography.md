@@ -8,7 +8,7 @@ dennishc@mail.uc.edu
 # Experience
 I have done all of my CO-OPs at [Etegent Technologies](http://etegent.com) as a Research Engineer CO-OP.
 
-The time periods I have worked (alternating part-time and fulltime) were Summer 2023 to the end of Spring 2025. I am also working at Etegent this semester(Fall 2025).
+The time periods I have worked (alternating part-time and fulltime) were Summer 2023 to the end of Spring 2025. I am also working  right now at Etegent, this semester (Fall 2025).
 
 ## Skills
 * python3 (extensive knowledge of ecosystem and tools)
