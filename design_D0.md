@@ -5,3 +5,4 @@ flowchart LR
 
 ```
 
+Boxes indicate steps for usage as an outside user. The arrows indicate the order of the steps the user would take to play this game.
