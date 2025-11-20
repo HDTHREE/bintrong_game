@@ -9,8 +9,8 @@
     "get-mistral": "mkdir -p models/mistral-7b && uvx --from huggingface_hub hf download mistralai/Mistral-7B-Instruct-v0.3 --local-dir ./models/mistral-7b",
     "build-slang": "docker build -f Dockerfile.sglang -t mistral-7b-sglang:fp8-tp8 .",
     "spawn-slang": "docker run -p 30000:4084 -v ./models/mistral-7b:/local/mistral-7b:ro --gpus all --shm-size=1g mistral-7b-sglang:fp8-tp8",
-    "spawn-sqlite": "./scripts/sqlite.sh",
-    "spawn-store": "./scripts/store.sh",
+    "spawn-sqlite": "docker run -d --name sqlite-db -v sqlite-data:/data -e SQLITE_DB=/data/mydb.db nouchka/sqlite:latest",
+    "spawn-store": "docker run --rm -d --name localstack -p 4566:4566 -p 4571:4571 -e SERVICES=s3,dynamodb -e DEFAULT_REGION=us-east-1 -e DEBUG=1 localstack/localstack:latest",
     "dev-api": "./scripts/api.py",
     "dev-app": "./scripts/app.py"
   },
