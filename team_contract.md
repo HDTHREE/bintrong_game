@@ -9,10 +9,10 @@
 * Austin Coontz
 
 # Timing
-I am starting this with 5 weeks remaining total in the semester, so I will be working all day and all night. However, most contributions will be done over the weekends due to my dayjob.
+I am starting this with 5 weeks remaining total in the semester, so I will be working as much as necessary. However, most contributions will be done over the weekends due to my day job.
 
 ## Workflow and Deployment
-I plan to deploy locally and provide docker deployment instructions for prod. The majority of the initial work will just be pushed to master and I do not plan to do PRs for myself. However, I will still create feature branches during development.
+I plan to deploy locally and provide docker deployment instructions for a production-ready deployment. The majority of the initial work will just be pushed to master and I do not plan to do PRs for myself. However, I will still create feature branches during development.
 
 # Project
 A fullstack web application to test and generate anki flashcards. I am Hayden and will be the sole developer and project manager.

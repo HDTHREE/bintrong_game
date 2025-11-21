@@ -11,4 +11,4 @@ flowchart LR
 
 ```
 
-Soft-edge boxes are actions. Circles are clients. Hard rectangles are applications.
+Soft-edge boxes are actions. Circles are clients. Hard rectangles are applications. This is still in the perspective of the outside user.
