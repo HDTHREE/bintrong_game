@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  sglang:
+    build:
+      context: .
+      dockerfile: Dockerfile.sglang
+    image: mistral-7b-sglang:fp8-tp8
+    ports:
+      - "30000:30000"
+    volumes:
+      - ./models/mistral-7b:/local/mistral-7b:ro
+    shm_size: "1g"
+    gpus: all
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:30000/v1/models"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  sqlite:
+    image: nouchka/sqlite3:latest
+    container_name: sqlite-db
+    volumes:
+      - sqlite-data:/data
+    environment:
+      - SQLITE_DB=/data/mydb.db
+    restart: unless-stopped
+
+  localstack:
+    image: localstack/localstack:latest
+    container_name: localstack
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=s3
+      - DEFAULT_REGION=us-east-1
+      - DEBUG=1
+    volumes:
+      - localstack_data:/tmp/localstack
+    restart: unless-stopped
+
+volumes:
+  sqlite-data:
+  localstack_data:
