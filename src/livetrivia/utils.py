@@ -135,9 +135,8 @@ def getenvs[T: tp.Any](strict: bool = True, logger: logging.Logger | None | bool
         types_: tuple[type] = tuple(map(pdc.locate, types_))
     elif len(types_):
         raise AssertionError("Something went wrong")
-    else:
-        ...
-        # TODO Implement real generic support via class decorator so multitype can be specified
+    types_ = types_ or [str] * len(labels)
+        
 
     values = tuple(map(os.getenv, labels))
 
