@@ -18,7 +18,7 @@ Austin Coontz | coontz.austin@gmail.com | TrustedSec
   * [Milestones & effort matrix](milestones.md)
 * [Constraints and Concerns](constraints.md)
   * Economic
-  * 
+  * Security
   * Legal
 * [Design presentation](https://github.com/HDTHREE/bintrong_game/raw/refs/heads/master/design_presentation.pptx)
 * [Self assessment essay](https://github.com/HDTHREE/bintrong_game/raw/refs/heads/master/capstone_assessment.docx)
