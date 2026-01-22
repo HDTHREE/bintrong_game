@@ -11,15 +11,7 @@ import logging
 import pydoc as pdc
 
 
-__all__: tuple[str] = ("retry_with_backoff", "ENV_ARGS")
-
-
-ENV_ARGS: tuple[str] = (
-    "MAX_ATTEMPTS",
-    "INITIAL_DELAY",
-    "BACKOFF_FACTOR",
-)
-
+__all__: tuple[str] = ("retry_with_backoff", )
 
 
 def _log_wrap(msg: tp.Any, logger: logging.Logger | None | bool = False) -> None:
@@ -48,37 +40,52 @@ def retry_with_backoff[P: dict[str, tp.Any], R: tp.Any](
     backoff_factor = max(1.0, backoff_factor)
 
     def decorator[T: tp.Callable[[tp.Unpack[P]], R | tp.Awaitable[R]]](func: T) -> T:
+        msg_f: str = "Attempt {attempt} failed: {e}. Retrying in {delay:.2f} seconds..."
+        fail_str: str = f"Failed call to {func} after {max_attempts}"
+
         def _make_sync_wrapper(func: T) -> T:
             @fnt.wraps(func)
             def wrapper(*args, **kwargs) -> R:
+                nonlocal msg_f, fail_str
+
                 delay: float = initial_delay + 0.0
+                ee: list[Exception] = []
+
                 for attempt in range(1, max_attempts + 1):
                     try:
                         return func(*args, **kwargs)
                     except exceptions_to_catch as e:
-                        _log_wrap(msg=f"Attempt {attempt} failed: {e}. Retrying in {delay:.2f} seconds...", logger=logger) # TODO This can be background in an async application
+                        msg: str = msg_f.format(attempt=attempt, e=e, delay=delay)
+                        _log_wrap(msg=msg, logger=logger)
+                        ee.append(e)
                         if attempt < max_attempts:
                             time.sleep(delay)
                             delay *= backoff_factor
                         else:
-                            raise
+                            raise ExceptionGroup(fail_str, ee)
 
             return wrapper
 
         def _make_async_wrapper(func: T) -> T:
             @fnt.wraps(func)
             async def wrapper(*args, **kwargs) -> tp.Awaitable[R]:
+                nonlocal msg_f, fail_str
+
                 delay: float = initial_delay + 0.0
+                ee: list[Exception] = []
+
                 for attempt in range(1, max_attempts + 1):
                     try:
                         return await func(*args, **kwargs)
                     except exceptions_to_catch as e:
-                        _log_wrap(msg=f"Attempt {attempt} failed: {e}. Retrying in {delay:.2f} seconds...", logger=logger)
+                        msg: str = msg_f.format(attempt=attempt, e=e, delay=delay)
+                        _log_wrap(msg=msg, logger=logger) # TODO This can be background in an async application
+                        ee.append(e)
                         if attempt < max_attempts:
                             await asyncio.sleep(delay)
                             delay *= backoff_factor
                         else:
-                            raise
+                            raise ExceptionGroup(fail_str, ee)
 
             return wrapper
 

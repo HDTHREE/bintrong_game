@@ -1,14 +1,13 @@
 import youtube_transcript_api as yt
 import os
 import threading
-from livetrivia.utils import retry_with_backoff, ENV_ARGS
+from livetrivia.utils import retry_with_backoff
 
 
 api: yt.YouTubeTranscriptApi = yt.YouTubeTranscriptApi()
 
 
 @retry_with_backoff(
-    **{arg: os.getenv(arg) for arg in ENV_ARGS if os.getenv(arg)},
     exceptions_to_catch=yt.YouTubeTranscriptApiException,
     logger=getattr(threading.local(), "LOGGER", None),
 )
