@@ -15,11 +15,11 @@ __all__: tuple[str] = ("retry_with_backoff",)
 
 
 def _log_wrap(msg: tp.Any, logger: logging.Logger | None | bool = False) -> None:
-    isinstance(logger, logging.Logger) and logger.debug(msg)
-    if isinstance(logger, bool):
-        logger and print(msg)
-        return
-    if logger is not None:
+    if isinstance(logger, logging.Logger):
+        return logger.debug(msg)
+    elif isinstance(logger, bool) and logger:
+        return print(msg)
+    if logger is not False and logger is not None:
         raise ValueError(f"Invalid logger input was provided. {msg}")
 
 
@@ -174,15 +174,14 @@ def getenvs[T: tp.Any](
         if value is None or type_ is None
     )
 
-    if none_values:
-        first, *rest = none_values
-        _log_wrap(
-            msg=f"Cannot find env variable(s): {first} {', '.join(rest)}", logger=logger
-        )
+    for nv_label in none_values:
+        _log_wrap(msg=f"Cannot find env variable(s): {nv_label} ", logger=logger)
         strict and exit(1)
 
     # Use the introspection values to deserialize our data (`d`) into the type (`t`).
-    values = tuple(itt.starmap(lambda t, d: t(d), zip(types_, values)))
+    values = tuple(
+        itt.starmap(lambda t, d: d if d is None else t(d), zip(types_, values))
+    )
 
     # If multivalue, return a tuple.
     if len(values) == 1:
