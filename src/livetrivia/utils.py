@@ -11,7 +11,7 @@ import logging
 import pydoc as pdc
 
 
-__all__: tuple[str] = ("retry_with_backoff", )
+__all__: tuple[str] = ("retry_with_backoff",)
 
 
 def _log_wrap(msg: tp.Any, logger: logging.Logger | None | bool = False) -> None:
@@ -79,7 +79,9 @@ def retry_with_backoff[P: dict[str, tp.Any], R: tp.Any](
                         return await func(*args, **kwargs)
                     except exceptions_to_catch as e:
                         msg: str = msg_f.format(attempt=attempt, e=e, delay=delay)
-                        _log_wrap(msg=msg, logger=logger) # TODO This can be background in an async application
+                        _log_wrap(
+                            msg=msg, logger=logger
+                        )  # TODO This can be background in an async application
                         ee.append(e)
                         if attempt < max_attempts:
                             await asyncio.sleep(delay)
@@ -112,53 +114,79 @@ def getmod(dunder_name: str) -> str:
     return mod
 
 
-def getenvs[T: tp.Any](strict: bool = True, logger: logging.Logger | None | bool = True) -> tuple[T, ...] | T:
+def getenvs[T: tp.Any](
+    strict: bool = True, logger: logging.Logger | None | bool = True
+) -> tuple[T, ...] | T:
     frame = inspect.currentframe()
     labels: tuple[str, ...] | str | None = None
     try:
+        # Get the callerframe source.
         caller_frame: types.FrameType = frame.f_back
         lines, line_number = inspect.getsourcelines(caller_frame)
-        current_line: str = lines[caller_frame.f_lineno - line_number - 1]
+
+        # Get the function signature, if it exists.
+        first_line, *_ = (line for line in lines if "@" not in line)
+
+        # Determine if in callframe of global declaration. If yes, offset by 1 (no function signature).
+        top_level: bool = not first_line.strip().startswith("def")
+        index: int = (caller_frame.f_lineno - line_number) + (-1 * top_level)
+
+        # Get the line containing `ENVLABEL = getenvs() from the source.`
+        current_line: str = lines[index]
         assignment: str = current_line.strip()
+
+        # Parse out assignee name.
         if "=" in assignment and "getenvs" in assignment:
-            labels, call = assignment.split("=")
+            labels, *_ = assignment.split("=")
+        # Parse out (1 or more) labels.
         if labels and ", " in labels:
             labels = tuple(labels.replace(" ", "").split(","))
         elif labels:
             labels = (labels.strip(),)
         else:
+            strict and exit(1)
             return None
     finally:
         del frame
 
     if "*_" in labels:
         raise RuntimeError("Cannot call `getenv` on line with `'*_'`")
-    
+
+    # Parse out (1 or more) types from assignment.
     labels, *types_ = tuple(zip(*map(lambda s: s.replace(" ", "").split(":"), labels)))
     if types_:
         types_, *_ = types_
 
+    # Get the type via the pydoc module, otherwise `str`.
     if len(labels) == 1:
         types_: tuple[type] = tuple(map(pdc.locate, types_))
     elif len(types_):
         raise AssertionError("Something went wrong")
+
+    # Multi-parse only supports strings.
     types_ = types_ or [str] * len(labels)
-        
 
     values = tuple(map(os.getenv, labels))
 
-    none_values: tuple[str, ...] = tuple(label for (value, label, type_) in zip(values, labels, types_) if value is None or type_ is None)
+    none_values: tuple[str, ...] = tuple(
+        label
+        for (value, label, type_) in zip(values, labels, types_)
+        if value is None or type_ is None
+    )
 
     if none_values:
         first, *rest = none_values
-        _log_wrap(msg=f"Cannot find env variable(s): {first} {", ".join(rest)}", logger=logger)
+        _log_wrap(
+            msg=f"Cannot find env variable(s): {first} {', '.join(rest)}", logger=logger
+        )
         strict and exit(1)
-    
+
+    # Use the introspection values to deserialize our data (`d`) into the type (`t`).
     values = tuple(itt.starmap(lambda t, d: t(d), zip(types_, values)))
 
+    # If multivalue, return a tuple.
     if len(values) == 1:
         values, *_ = values
         return values
-    
-    return values
 
+    return values

@@ -1,5 +1,4 @@
 import youtube_transcript_api as yt
-import os
 import threading
 from livetrivia.utils import retry_with_backoff
 

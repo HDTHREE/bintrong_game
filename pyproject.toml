@@ -28,6 +28,7 @@ frontend = [
 ]
 dev = [
     "ruff>=0.14.5",
+    "pytest>=9.0.2",
     "livetrivia[backend,frontend]",
     "uvicorn>=0.38.0",
 ]

@@ -22,7 +22,10 @@ def signup(req: SignupRequest, session: Session = Depends(get_session)):
     stmt = select(User).where(User.email == req.email)
     user = session.exec(stmt).first()
     if user:
-        return {"token": str(user.id), "user": {"id": str(user.id), "email": user.email}}
+        return {
+            "token": str(user.id),
+            "user": {"id": str(user.id), "email": user.email},
+        }
     user = User(email=req.email)
     session.add(user)
     session.commit()
@@ -39,7 +42,9 @@ def login(req: SignupRequest, session: Session = Depends(get_session)):
     return {"token": str(user.id), "user": {"id": str(user.id), "email": user.email}}
 
 
-def get_current_user(authorization: str | None = Header(None), session: Session = Depends(get_session)) -> User:
+def get_current_user(
+    authorization: str | None = Header(None), session: Session = Depends(get_session)
+) -> User:
     if not authorization:
         raise HTTPException(status_code=401, detail="Missing authorization header")
     if not authorization.lower().startswith("bearer "):
@@ -61,7 +66,11 @@ STORAGE_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @router.post("/files/upload", status_code=201)
-def upload_file(file: UploadFile, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+def upload_file(
+    file: UploadFile,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
     user_dir = STORAGE_DIR / str(current_user.id)
     user_dir.mkdir(parents=True, exist_ok=True)
     filename = Path(file.filename).name
@@ -74,7 +83,9 @@ def upload_file(file: UploadFile, current_user: User = Depends(get_current_user)
         i += 1
     with dest.open("wb") as f:
         shutil.copyfileobj(file.file, f)
-    file_rec = FileModel(prefix=str(dest.relative_to(Path.cwd())), user_id=current_user.id)
+    file_rec = FileModel(
+        prefix=str(dest.relative_to(Path.cwd())), user_id=current_user.id
+    )
     session.add(file_rec)
     session.commit()
     session.refresh(file_rec)
@@ -82,7 +93,10 @@ def upload_file(file: UploadFile, current_user: User = Depends(get_current_user)
 
 
 @router.get("/files")
-def list_files(current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+def list_files(
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
     stmt = select(FileModel).where(FileModel.user_id == current_user.id)
     files = session.exec(stmt).all()
     return [{"id": str(f.id), "prefix": f.prefix} for f in files]
