@@ -2,6 +2,9 @@ import typing_extensions as tp
 from sqlmodel import Field, SQLModel, Relationship
 import uuid
 from pydantic import EmailStr
+if tp.TYPE_CHECKING:
+    from livetrivia.models.session import Session
+    from livetrivia.models.file import File
 
 
 class User(SQLModel, table=True):
@@ -10,11 +13,4 @@ class User(SQLModel, table=True):
     password: str
 
     files: list["File"] = Relationship(back_populates="user")
-
-
-class File(SQLModel, table=True):
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    prefix: str
-
-    user_id: uuid.UUID = Field(foreign_key="user.id")
-    user: "User" = Relationship(back_populates="files")
+    sessions: list["Session"] = Relationship(back_populates="user")
