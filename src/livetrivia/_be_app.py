@@ -10,14 +10,7 @@ import typing_extensions as tp
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from sqlmodel import SQLModel, create_engine
-from sqlalchemy.engine import Engine
 from livetrivia.utils import getenvs
-
-
-SGLANG_URL, SQLITE_URL = getenvs()
-
-
-engine: Engine = create_engine(SQLITE_URL, connect_args={"check_same_thread": False})
 
 
 @asynccontextmanager
@@ -41,7 +34,8 @@ try:
     from livetrivia.routes.auth_and_files import router as routes_router
 
     api.include_router(routes_router, prefix="/api")
-except Exception:
+except Exception as e:
+    # print(e)
     ...
 
 
