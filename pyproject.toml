@@ -18,6 +18,10 @@ backend = [
     "sqlalchemy[asyncio]>=2.0.44",
     "pypdf>=6.2.0",
     "youtube-transcript-api>=1.2.3",
+    "python-multipart>=0.0.21",
+    "aiosqlite>=0.22.1",
+    "bcrypt>=5.0.0",
+    "pydantic[email]>=2.12.4",
 ]
 frontend = [
     "dash-ag-grid>=32.3.2",

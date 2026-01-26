@@ -9,14 +9,20 @@ finally:
 import typing_extensions as tp
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
-from sqlmodel import SQLModel, create_engine
+from sqlmodel import SQLModel
+from livetrivia.db import get_async_engine
 from livetrivia.utils import getenvs
+
+
+SQLITE_URL: str = getenvs()
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> tp.AsyncGenerator[None, None]:
-    SQLModel.metadata.create_all(engine)
-    yield
+    get_async_engine_context = asynccontextmanager(get_async_engine)
+    async with (get_async_engine_context(SQLITE_URL) as engine, engine.begin() as conn):
+        await conn.run_sync(SQLModel.metadata.create_all)
+        yield
 
 
 api: FastAPI = FastAPI(lifespan=lifespan)
@@ -31,12 +37,11 @@ async def root():
 
 
 try:
-    from livetrivia.routes.auth_and_files import router as routes_router
+    from livetrivia.routes.user import router as _user_router
 
-    api.include_router(routes_router, prefix="/api")
+    api.include_router(_user_router, prefix="/api")
 except Exception as e:
-    # print(e)
-    ...
+    print(e)
 
 
 if __name__ == "__main__":

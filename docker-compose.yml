@@ -19,15 +19,6 @@ services:
       retries: 3
     restart: unless-stopped
 
-  sqlite:
-    image: nouchka/sqlite3:latest
-    container_name: sqlite-db
-    volumes:
-      - sqlite-data:/data
-    environment:
-      - SQLITE_DB=/data/mydb.db
-    restart: unless-stopped
-
   localstack:
     image: localstack/localstack:latest
     container_name: localstack
