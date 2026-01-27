@@ -95,4 +95,5 @@ def get_token_type(token: str) -> Optional[str]:
     except jwt.InvalidTokenError:
         return None
 
+
 # TODO logging

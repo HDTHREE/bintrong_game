@@ -113,6 +113,7 @@ def load_pages() -> None:
 def load_callbacks() -> None:
     importlib.import_module("livetrivia._fe_app.callbacks")
 
+
 pages_folder: str = str(Path(os.path.abspath(__file__)).parent / "_fe_app" / "pages")
 assets_folder: str = str(Path(os.path.abspath(__file__)).parent / "_fe_app" / "assets")
 

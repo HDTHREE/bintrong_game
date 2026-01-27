@@ -31,10 +31,11 @@ async def on_login(_: int, email: str | None, password: str | None):
     if not email or not password:
         raise de.PreventUpdate()
     user: LoginRequest = LoginRequest(email=email, password=password)
-    async with aiohttp.ClientSession(BACKEND_URL) as session, session.post("api/sessions/login", json=user.model_dump()) as response:
+    async with (
+        aiohttp.ClientSession(BACKEND_URL) as session,
+        session.post("api/sessions/login", json=user.model_dump()) as response,
+    ):
         return await response.json()
-    
-    
 
 
 @dash.callback(
@@ -48,8 +49,13 @@ async def on_signup(_: int, email: str | None, password: str | None):
     if not email or not password:
         raise de.PreventUpdate()
     user: LoginRequest = LoginRequest(email=email, password=password)
-    async with aiohttp.ClientSession(BACKEND_URL) as session, session.post("api/users", json=user.model_dump()) as response:
-        async with session.post("api/sessions/login", json=user.model_dump()) as login_response:
+    async with (
+        aiohttp.ClientSession(BACKEND_URL) as session,
+        session.post("api/users", json=user.model_dump()) as response,
+    ):
+        async with session.post(
+            "api/sessions/login", json=user.model_dump()
+        ) as login_response:
             *_, token = await asyncio.gather(response.json(), login_response.json())
     return token
 
@@ -69,8 +75,6 @@ dash.clientside_callback(
     dash.Input(email_input, "value"),
     dash.Input(password_input, "value"),
 )
-
-
 
 
 dash.clientside_callback(

@@ -1,6 +1,7 @@
 import typing_extensions as tp
 from sqlmodel import Field, SQLModel, Relationship
 import uuid
+
 if tp.TYPE_CHECKING:
     from livetrivia.models.user import User
 

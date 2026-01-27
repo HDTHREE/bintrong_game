@@ -7,7 +7,6 @@ if tp.TYPE_CHECKING:
     from livetrivia.models.user import User
 
 
-
 class Session(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     user_id: uuid.UUID = Field(foreign_key="user.id")
@@ -19,4 +18,3 @@ class Session(SQLModel, table=True):
     is_active: bool = Field(default=True)
 
     user: "User" = Relationship(back_populates="sessions")
-

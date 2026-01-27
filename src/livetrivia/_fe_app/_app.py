@@ -5,7 +5,14 @@ try:
     _: bool = load_dotenv(r".dev.dash.env")
 finally:
     ...
-from dash import html, dcc, page_container, page_registry, Dash, _dash_renderer as dash_renderer
+from dash import (
+    html,
+    dcc,
+    page_container,
+    page_registry,
+    Dash,
+    _dash_renderer as dash_renderer,
+)
 import dash_mantine_components as dmc
 from livetrivia.utils import load_callbacks, load_pages, assets_folder, pages_folder
 
@@ -17,7 +24,7 @@ app: Dash = Dash(
     use_pages=True,
     pages_folder=pages_folder,
     assets_folder=assets_folder,
-    external_scripts = ["https://unpkg.com/dash.nprogress@latest/dist/dash.nprogress.js"]
+    external_scripts=["https://unpkg.com/dash.nprogress@latest/dist/dash.nprogress.js"],
 )
 
 

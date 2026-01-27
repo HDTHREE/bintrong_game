@@ -3,8 +3,6 @@ import dash_mantine_components as dmc
 from livetrivia.utils import getmod
 
 
-
-
 email_input = dmc.TextInput(
     placeholder="user@example.com",
     label="Email",
