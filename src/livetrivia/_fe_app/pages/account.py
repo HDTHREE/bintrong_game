@@ -27,8 +27,10 @@ account_card = dmc.Card(
     mah="40vh",
 )
 
+account = dmc.Center(account_card, h="100vh")
 
-layout = dmc.Center(account_card, h="100vh")
+
+layout = dmc.AppShellMain(account)
 
 
 dash.register_page(

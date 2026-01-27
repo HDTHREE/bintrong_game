@@ -8,10 +8,19 @@ from livetrivia.utils import getenvs
 SQLITE_URL: str = getenvs()
 
 
+S3_URL: str = getenvs()
+
+
+BUCKET_NAME: str = getenvs()
+
+
+S3_REGION: str = getenvs()
+
+
 async def get_async_engine(
-    URL: str = Depends(lambda: SQLITE_URL),
+    url: str = Depends(lambda: SQLITE_URL),
 ) -> tp.AsyncGenerator[sqlas.AsyncEngine]:
-    yield sqlas.create_async_engine(URL)
+    yield sqlas.create_async_engine(url)
 
 
 async def get_async_session(

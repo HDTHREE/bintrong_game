@@ -37,6 +37,7 @@ async def upload_file(
     )
     # TODO Figure out s3 file storage
     session.add(new_file)
+    a = (await file.read()).decode()
     await session.commit()
     await session.refresh(new_file)
 

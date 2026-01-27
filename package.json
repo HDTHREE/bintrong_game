@@ -7,6 +7,7 @@
     "build": "webpack --mode production",
     "lint": "xo --fix && uvx ruff check && uvx ruff format",
     "get-mistral": "mkdir -p models/mistral-7b && uvx --from huggingface_hub hf download mistralai/Mistral-7B-Instruct-v0.3 --local-dir ./models/mistral-7b",
+    "get-s3": "docker run --name localstack -p 4566:4566 -e SERVICES=s3 -e DEFAULT_REGION=us-east-1 -e DEBUG=1 localstack/localstack:latest",
     "dev-api": "./scripts/api.py",
     "dev-app": "./scripts/app.py"
   },

@@ -23,6 +23,7 @@ backend = [
     "bcrypt>=5.0.0",
     "pydantic[email]>=2.12.4",
     "pyjwt>=2.10.1",
+    "aioboto3>=15.5.0",
 ]
 frontend = [
     "aiohttp>=3.13.3",
