@@ -1,10 +1,6 @@
 globalThis.dash_clientside = { // eslint-disable-line camelcase
 	...globalThis.dash_clientside, login: {
-		updateCurrentMenu(new_, cancel) {
-			if (!new_ && !cancel) {
-				return [true, false];
-			}
-
+		updateCurrentMenu(_, __) {
 			// eslint-disable-next-line no-undef
 			if (dash_clientside.callback_context.triggered_id === 'new-button') { // eslint-disable-line camelcase
 				return [false, true];
@@ -19,6 +15,10 @@ globalThis.dash_clientside = { // eslint-disable-line camelcase
 			}
 
 			return password !== confirm;
+		},
+		redirectToAccount(_, __, token, user) {
+			if (!token || !user) return;
+			setTimeout(() => globalThis.location.href = '/login', 500)
 		},
 	},
 };

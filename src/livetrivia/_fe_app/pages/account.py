@@ -56,6 +56,12 @@ app.clientside_callback(
     dash.Input(user_store, "data"),
 )
 
+app.clientside_callback(
+    dash.ClientsideFunction("accounts", "redirectToLogin"),
+    dash.Input(sign_out_button, "n_clicks"),
+    dash.Input(sign_out_devices_button, "n_clicks"),
+)
+
 
 @app.callback(
     dash.Output(user_store, "data", allow_duplicate=True),

@@ -30,7 +30,7 @@ confirm_input = dmc.PasswordInput(label="Confirm", size="md", required=True)
 login_button = dmc.Button("Login")
 
 
-new_button = dmc.Button("New?")
+new_button = dmc.Button("New?", id="new-button") # Needed for identification in callback.
 
 
 create_button = dmc.Button("Create")
@@ -123,6 +123,15 @@ app.clientside_callback(
     dash.Output(create_collapse, "opened"),
     dash.Input(new_button, "n_clicks"),
     dash.Input(back_button, "n_clicks"),
+    prevent_initial_call=True,
+)
+
+app.clientside_callback(
+    dash.ClientsideFunction("login", "redirectToAccount"),
+    dash.Input(create_button, "n_clicks"),
+    dash.Input(login_button, "n_clicks"),
+    dash.Input(token_store, "data"),
+    dash.Input(user_store, "data")
 )
 
 
