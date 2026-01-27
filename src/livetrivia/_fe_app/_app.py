@@ -117,20 +117,12 @@ app.clientside_callback(
 )
 def middleware_callback(url: str, token: dict, user: str):
     session: bool = token and user
-    protected = ["/files", "/account" ]
+    protected = ["/files", "/account"]
 
     if url in protected and not session:
         return "/login"
 
     raise de.PreventUpdate()
-
-
-
-
-
-
-
-
 
 
 if __name__ == "__main__":

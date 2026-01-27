@@ -17,8 +17,13 @@ globalThis.dash_clientside = { // eslint-disable-line camelcase
 			return password !== confirm;
 		},
 		redirectToAccount(_, __, token, user) {
-			if (!token || !user) return;
-			setTimeout(() => globalThis.location.href = '/login', 500)
+			if (!token || !user) {
+				return;
+			}
+
+			setTimeout(() => {
+				globalThis.location.href = '/login';
+			}, 500);
 		},
 	},
 };
