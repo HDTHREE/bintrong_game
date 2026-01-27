@@ -1,9 +1,7 @@
 import asyncio
 import dash
-import uuid
 import dash.exceptions as de
 import aiohttp
-import dash
 import dash_mantine_components as dmc
 from livetrivia.utils import getenvs, getmod
 from livetrivia._fe_app.components import user_store, token_store
@@ -17,7 +15,9 @@ display_email = dmc.TextInput(
 sign_out_button = dmc.Button("Sign out")
 
 
-sign_out_devices_button = dmc.Button("Clear Existing Sessions" ,disabled=True) # TODO NYI
+sign_out_devices_button = dmc.Button(
+    "Clear Existing Sessions", disabled=True
+)  # TODO NYI
 
 
 account_card = dmc.Card(
@@ -28,10 +28,7 @@ account_card = dmc.Card(
 )
 
 
-file_card = dmc.Card(mah="40vh")
-
-
-layout = dmc.Center(dmc.Stack(children=[account_card, file_card]), h="100vh")
+layout = dmc.Center(account_card, h="100vh")
 
 
 dash.register_page(
@@ -67,6 +64,10 @@ async def on_signout(n_clicks: int | None, token: dict):
         aiohttp.ClientSession(BACKEND_URL) as session,
         session.post(url="api/sessions/logout", params=params) as logout_response,
     ):
-        async with session.delete(url="api/sessions/", params=params) as delete_session_response:
-            *_, = await asyncio.gather(logout_response.json(), delete_session_response.json())
+        async with session.delete(
+            url="api/sessions/", params=params
+        ) as delete_session_response:
+            (*_,) = await asyncio.gather(
+                logout_response.json(), delete_session_response.json()
+            )
     return None, None

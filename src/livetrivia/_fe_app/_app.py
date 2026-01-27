@@ -25,7 +25,7 @@ app: Dash = Dash(
     use_pages=True,
     pages_folder=pages_folder,
     assets_folder=assets_folder,
-    prevent_initial_callbacks='initial_duplicate',
+    prevent_initial_callbacks="initial_duplicate",
     external_scripts=["https://unpkg.com/dash.nprogress@latest/dist/dash.nprogress.js"],
 )
 

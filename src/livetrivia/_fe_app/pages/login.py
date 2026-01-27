@@ -72,8 +72,6 @@ login = dmc.Center(
 )
 
 
-
-
 @app.callback(
     dash.Output(token_store, "data", allow_duplicate=True),
     dash.Output(user_store, "data", allow_duplicate=True),
@@ -112,7 +110,9 @@ async def on_signup(_: int, email: str | None, password: str | None):
         async with session.post(
             "api/sessions/login", json=user.model_dump()
         ) as login_response:
-            *_, token = await asyncio.gather(session_response.json(), login_response.json())
+            *_, token = await asyncio.gather(
+                session_response.json(), login_response.json()
+            )
     return token, email
 
 
@@ -130,7 +130,7 @@ app.clientside_callback(
     dash.Output(login_button, "disabled"),
     dash.Input(email_input, "value"),
     dash.Input(password_input, "value"),
-    prevent_initial_call=True
+    prevent_initial_call=True,
 )
 
 
@@ -140,7 +140,7 @@ app.clientside_callback(
     dash.Input(email_input, "value"),
     dash.Input(password_input, "value"),
     dash.Input(confirm_input, "value"),
-    prevent_initial_call=True
+    prevent_initial_call=True,
 )
 
 
