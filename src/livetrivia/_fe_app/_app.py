@@ -115,12 +115,17 @@ app.clientside_callback(
     dash.State(user_store, "data"),
     prevent_initial_call=True,
 )
-def middleware_callback(url: str, token: dict, user: str):
+def middleware_callback(url: str | None, token: dict, user: str):
     session: bool = token and user
-    protected = ["/files", "/account"]
+    real = {"/files", "/account", "/", "/login", "/join"}
+    protected = {"/files", "/account"}
 
+    if not url or url not in real:
+        return "/"
     if url in protected and not session:
         return "/login"
+    if url == "/login" and session:
+        return "/account"
 
     raise de.PreventUpdate()
 
