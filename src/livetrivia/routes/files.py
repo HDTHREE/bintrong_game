@@ -5,7 +5,7 @@ import uuid
 
 from livetrivia.db import get_async_session
 from livetrivia.models.file import File
-from livetrivia.models.session import get_current_user
+from livetrivia.routes.session import get_current_user
 
 router: APIRouter = APIRouter(prefix="/files", tags=["files"])
 

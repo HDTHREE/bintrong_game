@@ -5,15 +5,10 @@ from pydantic import BaseModel, EmailStr
 import bcrypt
 import uuid
 
-from livetrivia.models.user import User
+from livetrivia.models.user import User, LoginRequest
 from livetrivia.db import get_async_session
 
 router: APIRouter = APIRouter(prefix="/users", tags=["users"])
-
-
-class UserCreate(BaseModel):
-    email: EmailStr
-    password: str
 
 
 class UserResponse(BaseModel):
@@ -37,11 +32,10 @@ def verify_password(password: str, hashed_password: str) -> bool:
 
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def create_user(
-    user_data: UserCreate,
+    user_data: LoginRequest,
     session: sqlas.AsyncSession = Depends(get_async_session),
 ) -> "User":
     """Create a new user with email and password."""
-    # Check if user already exists
     stmt = select(User).where(User.email == user_data.email)
     result = await session.execute(stmt)
     existing_user = result.scalars().first()
@@ -52,10 +46,8 @@ async def create_user(
             detail="Email already registered",
         )
 
-    # Hash password
     hashed_password = hash_password(user_data.password)
 
-    # Create new user
     new_user = User(email=user_data.email, password=hashed_password)
     session.add(new_user)
     await session.commit()

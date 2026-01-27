@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import time
 import inspect
 import functools as fnt
@@ -107,6 +108,13 @@ def retry_with_backoff[P: dict[str, tp.Any], R: tp.Any](
 
 def load_pages() -> None:
     importlib.import_module("livetrivia._fe_app.pages")
+
+
+def load_callbacks() -> None:
+    importlib.import_module("livetrivia._fe_app.callbacks")
+
+pages_folder: str = str(Path(os.path.abspath(__file__)).parent / "_fe_app" / "pages")
+assets_folder: str = str(Path(os.path.abspath(__file__)).parent / "_fe_app" / "assets")
 
 
 def getmod(dunder_name: str) -> str:

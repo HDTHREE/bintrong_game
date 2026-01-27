@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import select
 import sqlalchemy.ext.asyncio as sqlas
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from datetime import datetime
 import uuid
 
-from livetrivia.models.user import User
+from livetrivia.models.user import User, LoginRequest
 from livetrivia.models.session import Session
 from livetrivia.db import get_async_session
 from livetrivia.routes.user import verify_password
@@ -17,11 +17,6 @@ from livetrivia.jwt_utils import (
 )
 
 router: APIRouter = APIRouter(prefix="/sessions", tags=["sessions"])
-
-
-class LoginRequest(BaseModel):
-    email: EmailStr
-    password: str
 
 
 class SessionResponse(BaseModel):
@@ -234,3 +229,14 @@ async def delete_session(
 
     await session.delete(db_session)
     await session.commit()
+
+
+async def get_current_user(access_token: str) -> uuid.UUID:
+    """Verify access token and return user_id."""
+    user_id: uuid.UUID | None = verify_token(access_token, token_type="access")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired access token",
+        )
+    return user_id

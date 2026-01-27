@@ -25,11 +25,12 @@ backend = [
     "pyjwt>=2.10.1",
 ]
 frontend = [
+    "aiohttp>=3.13.3",
     "dash-ag-grid>=32.3.2",
-    "dash-extensions>=2.0.4",
     "dash-iconify>=0.1.2",
     "dash-mantine-components>=2.4.0",
     "dash[async]>=3.3.0",
+    "gunicorn>=23.0.0",
 ]
 dev = [
     "ruff>=0.14.5",
@@ -37,9 +38,6 @@ dev = [
     "pandas>=3.0.0",
     "livetrivia[backend,frontend]",
     "uvicorn>=0.38.0",
-]
-prod = [
-    "gunicorn>=23.0.0",
 ]
 
 [build-system]
