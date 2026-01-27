@@ -1,7 +1,7 @@
 from dash import dcc
 
 
-token = dcc.Store("token", "local")
+token_store = dcc.Store("token", "local")
 
 
-user = dcc.Store("user", "local")
+user_store = dcc.Store("user", "local")

@@ -14,8 +14,8 @@ from dash import (
     _dash_renderer as dash_renderer,
 )
 import dash_mantine_components as dmc
-from livetrivia.utils import load_callbacks, load_pages, assets_folder, pages_folder
-from livetrivia._fe_app.components import token, user
+from livetrivia.utils import assets_folder, pages_folder
+from livetrivia._fe_app.components import token_store, user_store
 
 
 dash_renderer._set_react_version("18.2.0")
@@ -25,12 +25,9 @@ app: Dash = Dash(
     use_pages=True,
     pages_folder=pages_folder,
     assets_folder=assets_folder,
+    prevent_initial_callbacks='initial_duplicate',
     external_scripts=["https://unpkg.com/dash.nprogress@latest/dist/dash.nprogress.js"],
 )
-
-
-load_pages()
-load_callbacks()
 
 
 links = [html.Div(dcc.Link(p["name"], href=p["path"])) for p in page_registry.values()]
@@ -42,9 +39,8 @@ app.layout = dmc.MantineProvider(
         children=[
             dmc.AppShellHeader(children=links),
             page_container,
-            token,
-            user,
-            
+            token_store,
+            user_store,
         ],
     )
 )
