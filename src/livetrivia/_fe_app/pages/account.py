@@ -44,8 +44,15 @@ BACKEND_URL: str = getenvs()
 
 
 app.clientside_callback(
-    dash.ClientsideFunction("accounts", "setDisplay"),
+    dash.ClientsideFunction("accounts", "updateDisplay"),
     dash.Output(display_email, "value"),
+    dash.Input(user_store, "data"),
+)
+
+
+app.clientside_callback(
+    dash.ClientsideFunction("accounts", "updateStateSignout"),
+    dash.Output(sign_out_button, "disabled"),
     dash.Input(user_store, "data"),
 )
 
@@ -55,6 +62,7 @@ app.clientside_callback(
     dash.Output(token_store, "data"),
     dash.Input(sign_out_button, "n_clicks"),
     dash.State(token_store, "data"),
+    prevent_initial_call=True,
 )
 async def on_signout(n_clicks: int | None, token: dict):
     if not token or not n_clicks:

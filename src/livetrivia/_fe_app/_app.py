@@ -11,8 +11,10 @@ from dash import (
     page_container,
     page_registry,
     Dash,
+    ClientsideFunction,
     _dash_renderer as dash_renderer,
 )
+import dash
 import dash_mantine_components as dmc
 from livetrivia.utils import assets_folder, pages_folder
 from livetrivia._fe_app.components import token_store, user_store
@@ -33,16 +35,25 @@ app: Dash = Dash(
 links = [html.Div(dcc.Link(p["name"], href=p["path"])) for p in page_registry.values()]
 
 
+avatar = dmc.Avatar()
+
+
 app.layout = dmc.MantineProvider(
     children=dmc.AppShell(
         header={"height": "8vh"},
         children=[
-            dmc.AppShellHeader(children=links),
+            dmc.AppShellHeader(children=links + [avatar]),
             page_container,
             token_store,
             user_store,
         ],
     )
+)
+
+app.clientside_callback(
+    ClientsideFunction("layout", "setInitials"),
+    dash.Output(avatar, "children"),
+    dash.Input(user_store, "data"),
 )
 
 if __name__ == "__main__":

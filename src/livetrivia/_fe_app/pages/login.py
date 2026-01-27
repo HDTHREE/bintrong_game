@@ -20,6 +20,7 @@ email_input = dmc.TextInput(
     required=True,
 )
 
+
 password_input = dmc.PasswordInput(label="Password", size="md", required=True)
 
 
