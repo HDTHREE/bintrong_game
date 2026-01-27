@@ -15,6 +15,7 @@ from dash import (
 )
 import dash_mantine_components as dmc
 from livetrivia.utils import load_callbacks, load_pages, assets_folder, pages_folder
+from livetrivia._fe_app.components import token, user
 
 
 dash_renderer._set_react_version("18.2.0")
@@ -41,6 +42,9 @@ app.layout = dmc.MantineProvider(
         children=[
             dmc.AppShellHeader(children=links),
             page_container,
+            token,
+            user,
+            
         ],
     )
 )

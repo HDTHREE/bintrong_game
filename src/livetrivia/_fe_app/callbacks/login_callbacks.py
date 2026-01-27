@@ -2,9 +2,12 @@ import aiohttp
 import asyncio
 import dash
 import dash.exceptions as de
+from livetrivia._fe_app.components import (
+    token,
+    user,
+)
 from livetrivia._fe_app.pages.login import (
     password_input,
-    token,
     email_input,
     confirm_input,
     create_collapse,
@@ -22,6 +25,7 @@ BACKEND_URL: str = getenvs()
 
 @dash.callback(
     dash.Output(token, "data", allow_duplicate=True),
+    dash.Output(user, "data", allow_duplicate=True),
     dash.Input(login_button, "n_clicks"),
     dash.State(email_input, "value"),
     dash.State(password_input, "value"),
@@ -35,11 +39,12 @@ async def on_login(_: int, email: str | None, password: str | None):
         aiohttp.ClientSession(BACKEND_URL) as session,
         session.post("api/sessions/login", json=user.model_dump()) as response,
     ):
-        return await response.json()
+        return await response.json(), email
 
 
 @dash.callback(
     dash.Output(token, "data", allow_duplicate=True),
+    dash.Output(user, "data", allow_duplicate=True),
     dash.Input(create_button, "n_clicks"),
     dash.State(email_input, "value"),
     dash.State(password_input, "value"),
@@ -57,7 +62,7 @@ async def on_signup(_: int, email: str | None, password: str | None):
             "api/sessions/login", json=user.model_dump()
         ) as login_response:
             *_, token = await asyncio.gather(response.json(), login_response.json())
-    return token
+    return token, email
 
 
 dash.clientside_callback(

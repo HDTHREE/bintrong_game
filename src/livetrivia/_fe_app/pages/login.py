@@ -28,7 +28,6 @@ create_button = dmc.Button("Create")
 back_button = dmc.Button("Back")
 
 
-token = dcc.Store("token", "local")
 
 
 login_collapse = dmc.Collapse(
@@ -58,7 +57,6 @@ login = dmc.Center(
                 dmc.Space(h=10),
                 login_collapse,
                 create_collapse,
-                token,
             ],
             flex="column",
         ),
