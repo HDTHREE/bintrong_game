@@ -3,7 +3,7 @@ import sqlalchemy.ext.asyncio as sqlas
 from pydantic import BaseModel
 import uuid
 
-from livetrivia.db import get_async_session
+from livetrivia.db import get_sql_session
 from livetrivia.models.file import File
 from livetrivia.routes.session import get_current_user
 
@@ -25,7 +25,7 @@ class FileResponse(BaseModel):
 async def upload_file(
     user_id: uuid.UUID = Depends(get_current_user),
     file: UploadFile = FormFile(...),
-    session: sqlas.AsyncSession = Depends(get_async_session),
+    session: sqlas.AsyncSession = Depends(get_sql_session),
 ) -> File:
     """Upload a file. Currently accepts files but doesn't store them."""
     filename: str = file.filename or "unnamed"

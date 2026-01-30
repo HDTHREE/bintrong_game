@@ -7,7 +7,7 @@ import uuid
 
 from livetrivia.models.user import User, LoginRequest
 from livetrivia.models.session import Session
-from livetrivia.db import get_async_session
+from livetrivia.db import get_sql_session
 from livetrivia.routes.user import verify_password
 from livetrivia.jwt_utils import (
     create_access_token,
@@ -46,7 +46,7 @@ class TokenResponse(BaseModel):
 
 @router.post("/guest", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 async def create_guest_session(
-    session: sqlas.AsyncSession = Depends(get_async_session),
+    session: sqlas.AsyncSession = Depends(get_sql_session),
 ) -> TokenResponse:
     # Create a temporary guest id that doens't actually get committed to the database.
     guest_id: uuid.UUID = uuid.uuid4()
@@ -85,7 +85,7 @@ async def create_guest_session(
 @router.post("/login", response_model=TokenResponse, status_code=status.HTTP_200_OK)
 async def login(
     login_data: LoginRequest,
-    session: sqlas.AsyncSession = Depends(get_async_session),
+    session: sqlas.AsyncSession = Depends(get_sql_session),
 ) -> TokenResponse:
     """Login a user and create 2 JWT session tokens."""
     stmt = select(User).where(User.email == login_data.email)
@@ -132,7 +132,7 @@ async def login(
 @router.post("/refresh", response_model=TokenResponse, status_code=status.HTTP_200_OK)
 async def refresh_access_token(
     refresh_token: str,
-    session: sqlas.AsyncSession = Depends(get_async_session),
+    session: sqlas.AsyncSession = Depends(get_sql_session),
 ) -> TokenResponse:
     """Refresh the access token using a valid refresh token."""
     user_id = verify_token(refresh_token, token_type="refresh")
@@ -181,7 +181,7 @@ async def refresh_access_token(
 @router.post("/logout", status_code=status.HTTP_200_OK)
 async def logout(
     access_token: str,
-    session: sqlas.AsyncSession = Depends(get_async_session),
+    session: sqlas.AsyncSession = Depends(get_sql_session),
 ) -> dict:
     """Disables a session. Sets flag to false."""
     user_id = verify_token(access_token, token_type="access")
@@ -213,7 +213,7 @@ async def logout(
 @router.get("/", response_model=SessionResponse, status_code=status.HTTP_200_OK)
 async def get_current_session(
     access_token: str,
-    session: sqlas.AsyncSession = Depends(get_async_session),
+    session: sqlas.AsyncSession = Depends(get_sql_session),
 ) -> Session:
     """Get current session information."""
     user_id = verify_token(access_token, token_type="access")
@@ -243,7 +243,7 @@ async def get_current_session(
 @router.delete("/", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_session(
     access_token: str,
-    session: sqlas.AsyncSession = Depends(get_async_session),
+    session: sqlas.AsyncSession = Depends(get_sql_session),
 ) -> None:
     """Delete a session record."""
     user_id = verify_token(access_token, token_type="access")

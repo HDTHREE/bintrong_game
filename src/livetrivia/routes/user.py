@@ -6,7 +6,7 @@ import bcrypt
 import uuid
 
 from livetrivia.models.user import User, LoginRequest
-from livetrivia.db import get_async_session
+from livetrivia.db import get_sql_session
 
 router: APIRouter = APIRouter(prefix="/users", tags=["users"])
 
@@ -33,7 +33,7 @@ def verify_password(password: str, hashed_password: str) -> bool:
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def create_user(
     user_data: LoginRequest,
-    session: sqlas.AsyncSession = Depends(get_async_session),
+    session: sqlas.AsyncSession = Depends(get_sql_session),
 ) -> "User":
     """Create a new user with email and password."""
     stmt = select(User).where(User.email == user_data.email)

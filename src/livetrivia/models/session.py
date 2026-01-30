@@ -1,4 +1,4 @@
-from sqlmodel import Field, SQLModel, Relationship, Computed
+from sqlmodel import Field, SQLModel, Relationship
 from pydantic import computed_field
 import uuid
 from datetime import datetime
