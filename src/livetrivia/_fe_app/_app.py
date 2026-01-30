@@ -5,12 +5,13 @@ try:
     _: bool = load_dotenv(r".dev.dash.env")
 finally:
     ...
+import aiohttp
 import dash_iconify as di
 import dash
 import dash.exceptions as de
 import dash_mantine_components as dmc
-from livetrivia.utils import assets_folder, pages_folder
-from livetrivia._fe_app.components import token_store, user_store
+from livetrivia.utils import assets_folder, getenvs, pages_folder
+from livetrivia._fe_app.components import token_store, user_store, interval
 
 
 dash._dash_renderer._set_react_version("18.2.0")
@@ -23,6 +24,8 @@ app: dash.Dash = dash.Dash(
     prevent_initial_callbacks="initial_duplicate",
     external_scripts=["https://unpkg.com/dash.nprogress@latest/dist/dash.nprogress.js"],
 )
+
+BACKEND_URL: str = getenvs()
 
 
 home_page = dash.page_registry["home"]
@@ -97,6 +100,7 @@ app.layout = dmc.MantineProvider(
             dash.page_container,
             token_store,
             user_store,
+            interval,
         ],
     )
 )
@@ -115,7 +119,7 @@ app.clientside_callback(
     dash.State(user_store, "data"),
     prevent_initial_call=True,
 )
-def middleware_callback(url: str | None, token: dict, user: str):
+def on_navigate(url: str | None, token: dict, user: str):
     session: bool = token and user
     real = {"/files", "/account", "/", "/login", "/join"}
     protected = {"/files", "/account"}
@@ -128,6 +132,27 @@ def middleware_callback(url: str | None, token: dict, user: str):
         return "/account"
 
     raise de.PreventUpdate()
+
+
+@app.callback(
+    dash.Output(token_store, "data", allow_duplicate=True),
+    dash.Input(token_store, "data"),
+    dash.State(user_store, "id"),
+    dash.Input(interval, "n_intervals"),
+    dash.State(interval, "id")
+)
+async def on_refresh(token: dict, email: str | None, _: int, id: str):
+    if dash.ctx.triggered_id != id and token:
+        raise de.PreventUpdate()
+    async with aiohttp.ClientSession(BACKEND_URL) as session:
+        # Get a guest (no email) session if no email.
+        if not token and not email:
+            async with session.post("api/sessions/guest") as session_response:
+                return await session_response.json()
+        # Otherwise, use refresh the existing session.
+        params = {"refresh_token": token["refresh_token"]}
+        async with session.post("api/sessions/refresh", params=params) as session_response:
+            return await session_response.json()
 
 
 if __name__ == "__main__":

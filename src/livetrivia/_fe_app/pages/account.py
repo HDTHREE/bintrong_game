@@ -67,7 +67,7 @@ app.clientside_callback(
 
 @app.callback(
     dash.Output(user_store, "data", allow_duplicate=True),
-    dash.Output(token_store, "data"),
+    dash.Output(token_store, "data", allow_duplicate=True),
     dash.Input(sign_out_button, "n_clicks"),
     dash.State(token_store, "data"),
     prevent_initial_call=True,
