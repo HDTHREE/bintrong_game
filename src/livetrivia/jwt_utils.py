@@ -1,7 +1,5 @@
 import jwt
-import typing as tp
 from datetime import datetime, timedelta, timezone
-import typing as tp
 import uuid
 
 from livetrivia.utils import getenvs
