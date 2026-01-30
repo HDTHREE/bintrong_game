@@ -6,24 +6,9 @@ try:
 finally:
     ...
 
-import typing_extensions as tp
 from fastapi.responses import RedirectResponse
 from fastapi import FastAPI
-from contextlib import asynccontextmanager
-from sqlmodel import SQLModel
-from livetrivia.db import get_async_engine
-from livetrivia.utils import getenvs
-
-
-SQLITE_URL: str = getenvs()
-
-
-@asynccontextmanager
-async def lifespan(_: FastAPI) -> tp.AsyncGenerator[None, None]:
-    get_async_engine_context = asynccontextmanager(get_async_engine)
-    async with get_async_engine_context(SQLITE_URL) as engine, engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
-        yield
+from livetrivia.db import lifespan
 
 
 api: FastAPI = FastAPI(lifespan=lifespan)

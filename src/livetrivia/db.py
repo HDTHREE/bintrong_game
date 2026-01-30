@@ -1,24 +1,15 @@
+from contextlib import asynccontextmanager
 import aioboto3
-import aiobotocore
+from aiobotocore.session import get_session
+from sqlmodel import SQLModel
 import typing_extensions as tp
-from fastapi import Depends
 import sqlalchemy.ext.asyncio as sqlas
 import sqlalchemy.orm as sqlorm
 from livetrivia.utils import getenvs
 if tp.TYPE_CHECKING:
-    import aiobotocore
+    from fastapi import Depends, FastAPI
 
-
-SQLITE_URL: str = getenvs()
-
-
-S3_URL: str = getenvs()
-
-
-BUCKET_NAME: str = getenvs()
-
-
-S3_REGION: str = getenvs()
+SQLITE_URL, S3_URL, S3_REGION, BUCKET_NAME = getenvs()
 
 
 async def get_sql_engine(
@@ -35,3 +26,32 @@ async def get_sql_session(
     )
     async with async_session() as session:
         yield session
+
+
+def get_s3_session(
+    botocore_session = Depends(get_session())
+) -> tp.Generator[aioboto3.Session]:
+    yield aioboto3.Session(botocore_session=botocore_session) # TODO prob add stuff here
+
+async def get_s3_client(
+    url: str = Depends(lambda: S3_URL),
+    region_name = Depends(lambda: S3_REGION),
+    aws_session: aioboto3.Session = Depends(get_s3_session),
+) -> tp.AsyncGenerator:
+    async with aws_session.client("s3", endpoint_url=url, region_name=region_name, aws_access_key_id="test", aws_secret_access_key="test") as s3:
+        yield s3
+
+
+@asynccontextmanager
+async def lifespan(_: "FastAPI") -> tp.AsyncGenerator[None, None]:
+    get_s3_session_context = asynccontextmanager(get_s3_session)
+    get_s3_client_context = asynccontextmanager(get_s3_client)
+
+    with get_s3_session_context() as aws_session:
+        async with get_s3_client_context(S3_URL, S3_REGION, aws_session) as s3:
+            s3.create_bucket("files")
+
+    get_sql_engine_context = asynccontextmanager(get_sql_engine)
+    async with get_sql_engine_context(SQLITE_URL) as engine, engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.create_all)
+        yield
