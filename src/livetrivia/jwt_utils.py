@@ -1,6 +1,7 @@
 import jwt
 from datetime import datetime, timedelta, timezone
 import uuid
+import typing_extensions as tp
 
 from livetrivia.utils import getenvs
 
@@ -44,7 +45,11 @@ def create_refresh_token(
     return encoded_jwt
 
 
-def verify_token(token: str, token_type: str | None = None) -> uuid.UUID | None:
+def verify_token(
+    token: str,
+    token_type: tp.Literal["access", "refresh"] | None = None,
+    strict: bool = True,
+) -> uuid.UUID | None:
     """Verify a JWT token and return the user_id if valid.
 
     Args:
@@ -55,40 +60,32 @@ def verify_token(token: str, token_type: str | None = None) -> uuid.UUID | None:
         user_id if valid, None otherwise.
     """
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload: dict = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id: str = payload.get("sub")
         if user_id is None:
             return None
 
         if token_type and payload.get("type") != token_type:
+            if strict:
+                raise jwt.MissingRequiredClaimError(f"type == {token_type}")
             return None
 
         return uuid.UUID(user_id)
-    except jwt.ExpiredSignatureError:
-        return None
-    except jwt.InvalidTokenError:
-        return None
+    except jwt.PyJWTError:
+        if strict:
+            raise
 
 
-def get_token_expiry(token: str) -> datetime | None:
+def get_token_expiry(token: str, strict: bool = True) -> datetime | None:
     """Get the expiry time of a token."""
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload: dict = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         exp = payload.get("exp")
-        if exp is None:
+        if (fail := exp is None) and strict:
+            raise jwt.MissingRequiredClaimError("exp")
+        if fail:
             return None
         return datetime.fromtimestamp(exp, tz=timezone.utc)
-    except jwt.InvalidTokenError:
-        return None
-
-
-def get_token_type(token: str) -> str | None:
-    """Get the type of a token (access or refresh)."""
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        return payload.get("type")
-    except jwt.InvalidTokenError:
-        return None
-
-
-# TODO logging
+    except jwt.PyJWTError:
+        if strict:
+            raise

@@ -25,7 +25,7 @@ class FileResponse(BaseModel):
 async def upload_file(
     user_id: uuid.UUID = Depends(get_current_user),
     file: UploadFile = FormFile(...),
-    session: sqlas.AsyncSession = Depends(get_sql_session),
+    sql: sqlas.AsyncSession = Depends(get_sql_session),
     s3=Depends(get_s3_client),
 ) -> File:
     id: uuid.UUID = uuid.uuid4()
@@ -45,9 +45,9 @@ async def upload_file(
         prefix=prefix,
         user_id=user_id,
     )
-    session.add(new_file)
-    await session.commit()
-    await session.refresh(new_file)
+    sql.add(new_file)
+    await sql.commit()
+    await sql.refresh(new_file)
 
     return new_file
 
@@ -56,10 +56,10 @@ async def upload_file(
 async def download_file(
     file_id: uuid.UUID,
     user_id: uuid.UUID = Depends(get_current_user),
-    session: sqlas.AsyncSession = Depends(get_sql_session),
+    sql: sqlas.AsyncSession = Depends(get_sql_session),
     s3=Depends(get_s3_client),
 ) -> StreamingResponse:
-    db_file = await session.get(File, file_id)
+    db_file = await sql.get(File, file_id)
     if not db_file:
         raise HTTPException(status_code=404, detail="file not found")
     if db_file.user_id != user_id:
@@ -95,10 +95,10 @@ async def download_file(
 async def delete_file(
     file_id: uuid.UUID,
     user_id: uuid.UUID = Depends(get_current_user),
-    session: sqlas.AsyncSession = Depends(get_sql_session),
+    sql: sqlas.AsyncSession = Depends(get_sql_session),
     s3=Depends(get_s3_client),
 ) -> None:
-    db_file = await session.get(File, file_id)
+    db_file = await sql.get(File, file_id)
     if not db_file:
         raise HTTPException(status_code=404, detail="file not found")
     if db_file.user_id != user_id:
@@ -111,5 +111,5 @@ async def delete_file(
     except Exception:
         raise HTTPException(status_code=500, detail="failed to delete from storage")
 
-    await session.delete(db_file)
-    await session.commit()
+    await sql.delete(db_file)
+    await sql.commit()

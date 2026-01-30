@@ -33,11 +33,11 @@ def verify_password(password: str, hashed_password: str) -> bool:
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def create_user(
     user_data: LoginRequest,
-    session: sqlas.AsyncSession = Depends(get_sql_session),
+    sql: sqlas.AsyncSession = Depends(get_sql_session),
 ) -> "User":
     """Create a new user with email and password."""
     stmt = select(User).where(User.email == user_data.email)
-    result = await session.execute(stmt)
+    result = await sql.execute(stmt)
     existing_user = result.scalars().first()
 
     if existing_user:
@@ -49,8 +49,8 @@ async def create_user(
     hashed_password = hash_password(user_data.password)
 
     new_user = User(email=user_data.email, password=hashed_password)
-    session.add(new_user)
-    await session.commit()
-    await session.refresh(new_user)
+    sql.add(new_user)
+    await sql.commit()
+    await sql.refresh(new_user)
 
     return new_user

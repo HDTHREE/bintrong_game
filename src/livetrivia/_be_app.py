@@ -26,10 +26,14 @@ try:
     from livetrivia.routes.user import router as _user_router
     from livetrivia.routes.session import router as _session_router
     from livetrivia.routes.files import router as _files_router
+    from livetrivia.routes.game import router as _game_router
+    from livetrivia.routes.round import router as _round_router
 
     api.include_router(_user_router, prefix="/api")
     api.include_router(_session_router, prefix="/api")
     api.include_router(_files_router, prefix="/api")
+    api.include_router(_game_router, prefix="/api")
+    api.include_router(_round_router, prefix="/api")
 except Exception as e:
     print(e)
 
