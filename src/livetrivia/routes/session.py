@@ -44,13 +44,15 @@ class TokenResponse(BaseModel):
         from_attributes = True
 
 
-@router.post("/guest", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/guest", response_model=TokenResponse, status_code=status.HTTP_201_CREATED
+)
 async def create_guest_session(
     session: sqlas.AsyncSession = Depends(get_sql_session),
 ) -> TokenResponse:
     # Create a temporary guest id that doens't actually get committed to the database.
     guest_id: uuid.UUID = uuid.uuid4()
-    
+
     access_token = create_access_token(guest_id)
     refresh_token = create_refresh_token(guest_id)
 

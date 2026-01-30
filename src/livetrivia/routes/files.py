@@ -21,14 +21,12 @@ class FileResponse(BaseModel):
         from_attributes = True
 
 
-@router.post(
-    "/", response_model=FileResponse, status_code=status.HTTP_201_CREATED
-)
+@router.post("/", response_model=FileResponse, status_code=status.HTTP_201_CREATED)
 async def upload_file(
     user_id: uuid.UUID = Depends(get_current_user),
     file: UploadFile = FormFile(...),
     session: sqlas.AsyncSession = Depends(get_sql_session),
-    s3 = Depends(get_s3_client),
+    s3=Depends(get_s3_client),
 ) -> File:
     id: uuid.UUID = uuid.uuid4()
     filename: str = file.filename or "unnamed"
@@ -54,13 +52,12 @@ async def upload_file(
     return new_file
 
 
-
 @router.get("/{file_id}")
 async def download_file(
     file_id: uuid.UUID,
     user_id: uuid.UUID = Depends(get_current_user),
     session: sqlas.AsyncSession = Depends(get_sql_session),
-    s3 = Depends(get_s3_client),
+    s3=Depends(get_s3_client),
 ) -> StreamingResponse:
     db_file = await session.get(File, file_id)
     if not db_file:
@@ -82,14 +79,14 @@ async def download_file(
     async def stream_body():
         nonlocal body
         chunk_size: int = 1024 * 64
-        while (chunk := await body.read(chunk_size)):
+        while chunk := await body.read(chunk_size):
             yield chunk
 
     headers = {}
     content_type = resp.get("ContentType") or "application/octet-stream"
     if resp.get("ContentLength") is not None:
         headers["content-length"] = str(resp.get("ContentLength"))
-    headers["content-disposition"] = f"attachment; filename=\"{key.split('/')[-1]}\""
+    headers["content-disposition"] = f'attachment; filename="{key.split("/")[-1]}"'
 
     return StreamingResponse(stream_body(), media_type=content_type, headers=headers)
 
@@ -99,7 +96,7 @@ async def delete_file(
     file_id: uuid.UUID,
     user_id: uuid.UUID = Depends(get_current_user),
     session: sqlas.AsyncSession = Depends(get_sql_session),
-    s3 = Depends(get_s3_client),
+    s3=Depends(get_s3_client),
 ) -> None:
     db_file = await session.get(File, file_id)
     if not db_file:

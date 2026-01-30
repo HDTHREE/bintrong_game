@@ -73,8 +73,11 @@ app.clientside_callback(
     prevent_initial_call=True,
 )
 async def on_signout(n_clicks: int | None, token: dict):
-    if not token or not n_clicks:
+    # This will fire on page load (regardless of the value of prevent_initial_call) so check if `None` for first trigger.
+    if n_clicks is None:
         raise de.PreventUpdate()
+    if not token or not token.get("access_token"):
+        return None, None
     params = {"access_token": token["access_token"]}
     async with (
         aiohttp.ClientSession(BACKEND_URL) as session,

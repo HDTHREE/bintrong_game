@@ -81,7 +81,7 @@ avatar_link = dmc.NavLink(
 )
 
 
-header_children = [home_link, join_link, login_link, avatar_link, files_link]
+header_children = [home_link, join_link, files_link, login_link, avatar_link]
 
 
 url = dash.dcc.Location(id="url")
@@ -112,6 +112,14 @@ app.clientside_callback(
 )
 
 
+app.clientside_callback(
+    dash.ClientsideFunction("layout", "setStyle"),
+    dash.Output(login_link, "style"),
+    dash.Output(avatar_link, "style"),
+    dash.Input(user_store, "data"),
+)
+
+
 @app.callback(
     dash.Output(url, "pathname"),
     dash.Input(url, "pathname"),
@@ -119,7 +127,7 @@ app.clientside_callback(
     dash.State(user_store, "data"),
     prevent_initial_call=True,
 )
-def on_navigate(url: str | None, token: dict, user: str):
+def on_navigate(url: str | None, token: dict | None, user: str | None):
     session: bool = token and user
     real = {"/files", "/account", "/", "/login", "/join"}
     protected = {"/files", "/account"}
@@ -139,19 +147,21 @@ def on_navigate(url: str | None, token: dict, user: str):
     dash.Input(token_store, "data"),
     dash.State(user_store, "id"),
     dash.Input(interval, "n_intervals"),
-    dash.State(interval, "id")
+    dash.State(interval, "id"),
 )
 async def on_refresh(token: dict, email: str | None, _: int, id: str):
     if dash.ctx.triggered_id != id and token:
         raise de.PreventUpdate()
     async with aiohttp.ClientSession(BACKEND_URL) as session:
         # Get a guest (no email) session if no email.
-        if not email:
+        if not email or not token:
             async with session.post("api/sessions/guest") as session_response:
                 return await session_response.json()
         # Otherwise, use refresh the existing session.
         params = {"refresh_token": token["refresh_token"]}
-        async with session.post("api/sessions/refresh", params=params) as session_response:
+        async with session.post(
+            "api/sessions/refresh", params=params
+        ) as session_response:
             # TODO logout if this shit fails
             return await session_response.json()
 
