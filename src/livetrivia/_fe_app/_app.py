@@ -146,12 +146,13 @@ async def on_refresh(token: dict, email: str | None, _: int, id: str):
         raise de.PreventUpdate()
     async with aiohttp.ClientSession(BACKEND_URL) as session:
         # Get a guest (no email) session if no email.
-        if not token and not email:
+        if not email:
             async with session.post("api/sessions/guest") as session_response:
                 return await session_response.json()
         # Otherwise, use refresh the existing session.
         params = {"refresh_token": token["refresh_token"]}
         async with session.post("api/sessions/refresh", params=params) as session_response:
+            # TODO logout if this shit fails
             return await session_response.json()
 
 

@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 import aioboto3
 from aiobotocore.session import get_session
@@ -6,6 +7,8 @@ import typing_extensions as tp
 import sqlalchemy.ext.asyncio as sqlas
 import sqlalchemy.orm as sqlorm
 from livetrivia.utils import getenvs
+from fastapi import Depends
+
 if tp.TYPE_CHECKING:
     from fastapi import Depends, FastAPI
 
@@ -28,10 +31,8 @@ async def get_sql_session(
         yield session
 
 
-def get_s3_session(
-    botocore_session = Depends(get_session())
-) -> tp.Generator[aioboto3.Session]:
-    yield aioboto3.Session(botocore_session=botocore_session) # TODO prob add stuff here
+async def get_s3_session() -> tp.AsyncGenerator[aioboto3.Session]:
+    yield aioboto3.Session() # TODO prob add stuff here
 
 async def get_s3_client(
     url: str = Depends(lambda: S3_URL),
@@ -47,11 +48,10 @@ async def lifespan(_: "FastAPI") -> tp.AsyncGenerator[None, None]:
     get_s3_session_context = asynccontextmanager(get_s3_session)
     get_s3_client_context = asynccontextmanager(get_s3_client)
 
-    with get_s3_session_context() as aws_session:
-        async with get_s3_client_context(S3_URL, S3_REGION, aws_session) as s3:
-            s3.create_bucket("files")
+    async with get_s3_session_context() as aws_session, get_s3_client_context(S3_URL, S3_REGION, aws_session) as s3:
+        p1 = s3.create_bucket(Bucket=BUCKET_NAME)
 
     get_sql_engine_context = asynccontextmanager(get_sql_engine)
     async with get_sql_engine_context(SQLITE_URL) as engine, engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
+        await asyncio.gather(p1, conn.run_sync(SQLModel.metadata.create_all))
         yield
