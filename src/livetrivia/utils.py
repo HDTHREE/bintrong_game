@@ -1,5 +1,7 @@
 import os
 from pathlib import Path
+import random
+import string
 import time
 import inspect
 import functools as fnt
@@ -114,6 +116,11 @@ assets_folder: str = str(Path(os.path.abspath(__file__)).parent / "_fe_app" / "a
 def getmod(dunder_name: str) -> str:
     *_, mod = dunder_name.split(".")
     return mod
+
+
+def generate_random_string(length: int) -> str:
+    characters = string.ascii_letters + string.digits
+    return "".join(random.choice(characters) for _ in range(length))
 
 
 def getenvs[T: tp.Any](

@@ -11,12 +11,15 @@ if tp.TYPE_CHECKING:
 class Session(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     user_id: uuid.UUID | None = Field(default=None, foreign_key="user.id")
+
     access_token: str
     refresh_token: str
+    is_active: bool = Field(default=True)
+
     created_at: datetime = Field(default_factory=datetime.now)
+
     access_token_expires_at: datetime
     refresh_token_expires_at: datetime
-    is_active: bool = Field(default=True)
 
     user: "User" = Relationship(back_populates="sessions")
 
