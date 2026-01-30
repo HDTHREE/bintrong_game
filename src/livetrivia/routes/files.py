@@ -3,11 +3,12 @@ from pydantic import BaseModel
 import uuid
 
 from livetrivia.db import get_sql_session, get_s3_client, BUCKET_NAME
-from livetrivia.models.file import File
+from livetrivia.models.files import File
 from livetrivia.routes.session import get_current_user
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
 import typing_extensions as tp
+from sqlmodel import select
 
 if tp.TYPE_CHECKING:
     import sqlalchemy.ext.asyncio as sqlas
@@ -17,6 +18,15 @@ router: APIRouter = APIRouter(prefix="/files", tags=["files"])
 
 
 class FileResponse(BaseModel):
+    id: uuid.UUID
+    prefix: str
+    user_id: uuid.UUID
+
+    class Config:
+        from_attributes = True
+
+
+class FileDataResponse(BaseModel):
     id: uuid.UUID
     prefix: str
     user_id: uuid.UUID
@@ -63,13 +73,13 @@ async def download_file(
     sql: "sqlas.AsyncSession" = Depends(get_sql_session),
     s3: "aiob3t.S3Client" = Depends(get_s3_client),
 ) -> StreamingResponse:
-    db_file = await sql.get(File, file_id)
-    if not db_file:
+    file = await sql.get(File, file_id)
+    if not file:
         raise HTTPException(status_code=404, detail="file not found")
-    if db_file.user_id != user_id:
+    if file.user_id != user_id:
         raise HTTPException(status_code=403, detail="forbidden")
 
-    key = db_file.prefix
+    key = file.prefix
 
     try:
         resp = await s3.get_object(Bucket=BUCKET_NAME, Key=key)
@@ -102,18 +112,48 @@ async def delete_file(
     sql: "sqlas.AsyncSession" = Depends(get_sql_session),
     s3: "aiob3t.S3Client" = Depends(get_s3_client),
 ) -> None:
-    db_file = await sql.get(File, file_id)
-    if not db_file:
+    file = await sql.get(File, file_id)
+    if not file:
         raise HTTPException(status_code=404, detail="file not found")
-    if db_file.user_id != user_id:
+    if file.user_id != user_id:
         raise HTTPException(status_code=403, detail="forbidden")
 
-    key: str = db_file.prefix
+    key: str = file.prefix
 
     try:
         await s3.delete_object(Bucket=BUCKET_NAME, Key=key)
     except Exception:
         raise HTTPException(status_code=500, detail="failed to delete from storage")
 
-    await sql.delete(db_file)
+    await sql.delete(file)
     await sql.commit()
+
+
+@router.get(
+    "/data/{file_id}", response_model=FileDataResponse, status_code=status.HTTP_200_OK
+)
+async def get_file_data(
+    file_id: uuid.UUID,
+    user_id: uuid.UUID = Depends(get_current_user),
+    sql: "sqlas.AsyncSession" = Depends(get_sql_session),
+) -> FileDataResponse:
+    file = await sql.get(File, file_id)
+    if not file:
+        raise HTTPException(status_code=404, detail="file not found")
+    if file.user_id != user_id:
+        raise HTTPException(status_code=403, detail="forbidden")
+    return file
+
+@router.get(
+    "/data/", response_model=list[FileDataResponse], status_code=status.HTTP_200_OK
+)
+async def get_all_files_data(
+    user_id: uuid.UUID = Depends(get_current_user),
+    sql: "sqlas.AsyncSession" = Depends(get_sql_session),
+) -> list[FileDataResponse]:
+    stmt = select(File).where(File.user_id == user_id)
+    result = await sql.execute(stmt)
+    files = result.scalars().all()
+    return [
+        FileDataResponse(id=f.id, prefix=f.prefix, user_id=f.user_id) for f in files
+    ]

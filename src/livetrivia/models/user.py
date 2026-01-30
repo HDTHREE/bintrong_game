@@ -5,7 +5,7 @@ from pydantic import EmailStr, BaseModel
 
 if tp.TYPE_CHECKING:
     from livetrivia.models.session import Session
-    from livetrivia.models.file import File
+    from livetrivia.models.files import File
 
 
 class User(SQLModel, table=True):

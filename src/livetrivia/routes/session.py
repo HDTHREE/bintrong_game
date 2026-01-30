@@ -48,7 +48,7 @@ class TokenResponse(BaseModel):
     "/guest", response_model=TokenResponse, status_code=status.HTTP_201_CREATED
 )
 async def create_guest_session(
-    session: sqlas.AsyncSession = Depends(get_sql_session),
+    sql: sqlas.AsyncSession = Depends(get_sql_session),
 ) -> TokenResponse:
     # Create a temporary guest id that doens't actually get committed to the database.
     guest_id: uuid.UUID = uuid.uuid4()
@@ -72,9 +72,9 @@ async def create_guest_session(
         access_token_expires_at=access_token_expires_at,
         refresh_token_expires_at=refresh_token_expires_at,
     )
-    session.add(new_session)
-    await session.commit()
-    await session.refresh(new_session)
+    sql.add(new_session)
+    await sql.commit()
+    await sql.refresh(new_session)
 
     return TokenResponse(
         access_token=access_token,
@@ -87,11 +87,11 @@ async def create_guest_session(
 @router.post("/login", response_model=TokenResponse, status_code=status.HTTP_200_OK)
 async def login(
     login_data: LoginRequest,
-    session: sqlas.AsyncSession = Depends(get_sql_session),
+    sql: sqlas.AsyncSession = Depends(get_sql_session),
 ) -> TokenResponse:
     """Login a user and create 2 JWT session tokens."""
     stmt = select(User).where(User.email == login_data.email)
-    result = await session.execute(stmt)
+    result = await sql.session.execute(stmt)
     user = result.scalars().first()
 
     if not user or not verify_password(login_data.password, user.password):
@@ -119,9 +119,9 @@ async def login(
         access_token_expires_at=access_token_expires_at,
         refresh_token_expires_at=refresh_token_expires_at,
     )
-    session.add(new_session)
-    await session.commit()
-    await session.refresh(new_session)
+    sql.add(new_session)
+    await sql.commit()
+    await sql.refresh(new_session)
 
     return TokenResponse(
         access_token=access_token,
@@ -134,7 +134,7 @@ async def login(
 @router.post("/refresh", response_model=TokenResponse, status_code=status.HTTP_200_OK)
 async def refresh_access_token(
     refresh_token: str,
-    session: sqlas.AsyncSession = Depends(get_sql_session),
+    sql: sqlas.AsyncSession = Depends(get_sql_session),
 ) -> TokenResponse:
     """Refresh the access token using a valid refresh token."""
     user_id = verify_token(refresh_token, token_type="refresh")
@@ -149,10 +149,10 @@ async def refresh_access_token(
         & (Session.user_id == user_id)
         & (Session.is_active)
     )
-    result = await session.execute(stmt)
-    db_session = result.scalars().first()
+    result = await sql.execute(stmt)
+    session = result.scalars().first()
 
-    if not db_session:
+    if not session:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Session not found or inactive",
@@ -167,23 +167,23 @@ async def refresh_access_token(
             detail="Failed to generate new access token",
         )
 
-    db_session.access_token = new_access_token
-    db_session.access_token_expires_at = access_token_expires_at
-    session.add(db_session)
+    session.access_token = new_access_token
+    session.access_token_expires_at = access_token_expires_at
+    sql.add(session)
     await session.commit()
 
     return TokenResponse(
         access_token=new_access_token,
         refresh_token=refresh_token,
         access_token_expires_at=access_token_expires_at,
-        refresh_token_expires_at=db_session.refresh_token_expires_at,
+        refresh_token_expires_at=session.refresh_token_expires_at,
     )
 
 
 @router.post("/logout", status_code=status.HTTP_200_OK)
 async def logout(
     access_token: str,
-    session: sqlas.AsyncSession = Depends(get_sql_session),
+    sql: sqlas.AsyncSession = Depends(get_sql_session),
 ) -> dict:
     """Disables a session. Sets flag to false."""
     user_id = verify_token(access_token, token_type="access")
@@ -196,18 +196,18 @@ async def logout(
     stmt = select(Session).where(
         (Session.access_token == access_token) & (Session.user_id == user_id)
     )
-    result = await session.execute(stmt)
-    db_session = result.scalars().first()
+    result = await sql.execute(stmt)
+    session = result.scalars().first()
 
-    if not db_session:
+    if not session:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Session not found",
         )
 
-    db_session.is_active = False
-    session.add(db_session)
-    await session.commit()
+    session.is_active = False
+    sql.add(session)
+    await sql.commit()
 
     return {"message": "Logged out successfully"}
 
@@ -215,7 +215,7 @@ async def logout(
 @router.get("/", response_model=SessionResponse, status_code=status.HTTP_200_OK)
 async def get_current_session(
     access_token: str,
-    session: sqlas.AsyncSession = Depends(get_sql_session),
+    sql: sqlas.AsyncSession = Depends(get_sql_session),
 ) -> Session:
     """Get current session information."""
     user_id = verify_token(access_token, token_type="access")
@@ -230,22 +230,22 @@ async def get_current_session(
         & (Session.user_id == user_id)
         & (Session.is_active)
     )
-    result = await session.execute(stmt)
-    db_session = result.scalars().first()
+    result = await sql.execute(stmt)
+    session = result.scalars().first()
 
-    if not db_session:
+    if not session:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Session not found or inactive",
         )
 
-    return db_session
+    return session
 
 
 @router.delete("/", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_session(
     access_token: str,
-    session: sqlas.AsyncSession = Depends(get_sql_session),
+    sql: sqlas.AsyncSession = Depends(get_sql_session),
 ) -> None:
     """Delete a session record."""
     user_id = verify_token(access_token, token_type="access")
@@ -258,7 +258,7 @@ async def delete_session(
     stmt = select(Session).where(
         (Session.access_token == access_token) & (Session.user_id == user_id)
     )
-    result = await session.execute(stmt)
+    result = await sql.execute(stmt)
     db_session = result.scalars().first()
 
     if not db_session:
@@ -267,8 +267,8 @@ async def delete_session(
             detail="Session not found",
         )
 
-    await session.delete(db_session)
-    await session.commit()
+    await sql.delete(db_session)
+    await sql.commit()
 
 
 async def get_current_user(access_token: str) -> uuid.UUID:
