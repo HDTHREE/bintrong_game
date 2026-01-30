@@ -44,6 +44,44 @@ class TokenResponse(BaseModel):
         from_attributes = True
 
 
+@router.post("/guest", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+async def create_guest_session(
+    session: sqlas.AsyncSession = Depends(get_async_session),
+) -> TokenResponse:
+    # Create a temporary guest id that doens't actually get committed to the database.
+    guest_id: uuid.UUID = uuid.uuid4()
+    
+    access_token = create_access_token(guest_id)
+    refresh_token = create_refresh_token(guest_id)
+
+    access_token_expires_at = get_token_expiry(access_token)
+    refresh_token_expires_at = get_token_expiry(refresh_token)
+
+    if access_token_expires_at is None or refresh_token_expires_at is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to generate tokens",
+        )
+
+    new_session = Session(
+        user_id=None,  # (i.e. this is `None`.)
+        access_token=access_token,
+        refresh_token=refresh_token,
+        access_token_expires_at=access_token_expires_at,
+        refresh_token_expires_at=refresh_token_expires_at,
+    )
+    session.add(new_session)
+    await session.commit()
+    await session.refresh(new_session)
+
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        access_token_expires_at=access_token_expires_at,
+        refresh_token_expires_at=refresh_token_expires_at,
+    )
+
+
 @router.post("/login", response_model=TokenResponse, status_code=status.HTTP_200_OK)
 async def login(
     login_data: LoginRequest,

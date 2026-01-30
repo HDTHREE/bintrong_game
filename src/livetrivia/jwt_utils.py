@@ -1,7 +1,7 @@
 import jwt
 import typing as tp
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+import typing as tp
 import uuid
 
 from livetrivia.utils import getenvs
@@ -17,7 +17,7 @@ REFRESH_TOKEN_EXPIRE_DAYS: int = getenvs()
 
 
 def create_access_token(
-    user_id: uuid.UUID, expires_delta: Optional[timedelta] = None
+    user_id: uuid.UUID, expires_delta: timedelta | None = None
 ) -> str:
     """Create a JWT access token."""
     if expires_delta:
@@ -33,7 +33,7 @@ def create_access_token(
 
 
 def create_refresh_token(
-    user_id: uuid.UUID, expires_delta: Optional[timedelta] = None
+    user_id: uuid.UUID, expires_delta: timedelta | None = None
 ) -> str:
     """Create a JWT refresh token."""
     if expires_delta:
@@ -46,10 +46,7 @@ def create_refresh_token(
     return encoded_jwt
 
 
-type TokenType = tp.Literal["access", "refresh"] | None
-
-
-def verify_token(token: str, token_type: Optional[str] = None) -> Optional[uuid.UUID]:
+def verify_token(token: str, token_type: str | None = None) -> uuid.UUID | None:
     """Verify a JWT token and return the user_id if valid.
 
     Args:
@@ -75,7 +72,7 @@ def verify_token(token: str, token_type: Optional[str] = None) -> Optional[uuid.
         return None
 
 
-def get_token_expiry(token: str) -> Optional[datetime]:
+def get_token_expiry(token: str) -> datetime | None:
     """Get the expiry time of a token."""
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -87,7 +84,7 @@ def get_token_expiry(token: str) -> Optional[datetime]:
         return None
 
 
-def get_token_type(token: str) -> Optional[str]:
+def get_token_type(token: str) -> str | None:
     """Get the type of a token (access or refresh)."""
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
