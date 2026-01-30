@@ -12,3 +12,8 @@ class File(SQLModel, table=True):
 
     user_id: uuid.UUID = Field(foreign_key="user.id")
     user: "User" = Relationship(back_populates="files")
+
+    used_in: "list[File]" = Relationship()
+
+    generated_from: "File | None" = Relationship(back_populates="used_in")
+    generated_from_id: uuid.UUID | None = Field(foreign_key="file.id")
