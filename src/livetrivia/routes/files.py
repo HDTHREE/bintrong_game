@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, status, UploadFile, File as FormFile
-import sqlalchemy.ext.asyncio as sqlas
 from pydantic import BaseModel
 import uuid
 
@@ -8,6 +7,11 @@ from livetrivia.models.file import File
 from livetrivia.routes.session import get_current_user
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
+import typing_extensions as tp
+
+if tp.TYPE_CHECKING:
+    import sqlalchemy.ext.asyncio as sqlas
+    import types_aiobotocore_s3 as aiob3t
 
 router: APIRouter = APIRouter(prefix="/files", tags=["files"])
 
@@ -25,8 +29,8 @@ class FileResponse(BaseModel):
 async def upload_file(
     user_id: uuid.UUID = Depends(get_current_user),
     file: UploadFile = FormFile(...),
-    sql: sqlas.AsyncSession = Depends(get_sql_session),
-    s3=Depends(get_s3_client),
+    sql: "sqlas.AsyncSession" = Depends(get_sql_session),
+    s3: "aiob3t.S3Client" = Depends(get_s3_client),
 ) -> File:
     id: uuid.UUID = uuid.uuid4()
     filename: str = file.filename or "unnamed"
@@ -56,8 +60,8 @@ async def upload_file(
 async def download_file(
     file_id: uuid.UUID,
     user_id: uuid.UUID = Depends(get_current_user),
-    sql: sqlas.AsyncSession = Depends(get_sql_session),
-    s3=Depends(get_s3_client),
+    sql: "sqlas.AsyncSession" = Depends(get_sql_session),
+    s3: "aiob3t.S3Client" = Depends(get_s3_client),
 ) -> StreamingResponse:
     db_file = await sql.get(File, file_id)
     if not db_file:
@@ -95,8 +99,8 @@ async def download_file(
 async def delete_file(
     file_id: uuid.UUID,
     user_id: uuid.UUID = Depends(get_current_user),
-    sql: sqlas.AsyncSession = Depends(get_sql_session),
-    s3=Depends(get_s3_client),
+    sql: "sqlas.AsyncSession" = Depends(get_sql_session),
+    s3: "aiob3t.S3Client" = Depends(get_s3_client),
 ) -> None:
     db_file = await sql.get(File, file_id)
     if not db_file:
@@ -104,7 +108,7 @@ async def delete_file(
     if db_file.user_id != user_id:
         raise HTTPException(status_code=403, detail="forbidden")
 
-    key = db_file.prefix
+    key: str = db_file.prefix
 
     try:
         await s3.delete_object(Bucket=BUCKET_NAME, Key=key)

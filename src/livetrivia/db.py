@@ -10,6 +10,8 @@ from fastapi import Depends
 
 if tp.TYPE_CHECKING:
     from fastapi import Depends, FastAPI
+    import types_aiobotocore_s3 as aiob3t
+
 
 SQLITE_URL, S3_URL, S3_REGION, BUCKET_NAME = getenvs()
 
@@ -38,7 +40,7 @@ async def get_s3_client(
     url: str = Depends(lambda: S3_URL),
     region_name=Depends(lambda: S3_REGION),
     aws_session: aioboto3.Session = Depends(get_s3_session),
-) -> tp.AsyncGenerator:
+) -> "tp.AsyncGenerator[aiob3t.S3Client]":
     async with aws_session.client(
         "s3",
         endpoint_url=url,

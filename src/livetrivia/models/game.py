@@ -16,7 +16,7 @@ class Game(SQLModel, table=True):
     host_session_id: uuid.UUID = Field(foreign_key="session.id")
 
     game_code: str | None = Field(
-        default=fnt.partial(generate_random_string(6)), unique=True, index=True
+        default=fnt.partial(generate_random_string, length=6), unique=True, index=True
     )
     status: Status = Field(default=Status.STARTING)
 

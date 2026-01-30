@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import select
-import sqlalchemy.ext.asyncio as sqlas
 from pydantic import BaseModel
 from datetime import datetime
 import uuid
@@ -11,6 +10,10 @@ from livetrivia.models.game import Game
 from livetrivia.models.session import Session
 from livetrivia.models.status import Status
 from livetrivia.jwt_utils import verify_token
+import typing_extensions as tp
+
+if tp.TYPE_CHECKING:
+    import sqlalchemy.ext.asyncio as sqlas
 
 router: APIRouter = APIRouter(prefix="/rounds", tags=["rounds"])
 
@@ -27,11 +30,13 @@ class RoundResponse(BaseModel):
         from_attributes = True
 
 
-@router.post("/{game_id}", response_model=RoundResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{game_id}", response_model=RoundResponse, status_code=status.HTTP_201_CREATED
+)
 async def create_round(
     game_id: uuid.UUID,
     access_token: str,
-    sql: sqlas.AsyncSession = Depends(get_sql_session),
+    sql: "sqlas.AsyncSession" = Depends(get_sql_session),
 ) -> Round:
     user_id = verify_token(access_token, token_type="access")
     if not user_id:
@@ -81,11 +86,13 @@ async def create_round(
     return new_round
 
 
-@router.post("/{round_id}/start", response_model=RoundResponse, status_code=status.HTTP_200_OK)
+@router.post(
+    "/{round_id}/start", response_model=RoundResponse, status_code=status.HTTP_200_OK
+)
 async def start_round(
     round_id: uuid.UUID,
     access_token: str,
-    sql: sqlas.AsyncSession = Depends(get_sql_session),
+    sql: "sqlas.AsyncSession" = Depends(get_sql_session),
 ) -> Round:
     user_id = verify_token(access_token, token_type="access")
     if not user_id:
@@ -145,11 +152,13 @@ async def start_round(
     return round_obj
 
 
-@router.post("/{round_id}/end", response_model=RoundResponse, status_code=status.HTTP_200_OK)
+@router.post(
+    "/{round_id}/end", response_model=RoundResponse, status_code=status.HTTP_200_OK
+)
 async def end_round(
     round_id: uuid.UUID,
     access_token: str,
-    sql: sqlas.AsyncSession = Depends(get_sql_session),
+    sql: "sqlas.AsyncSession" = Depends(get_sql_session),
 ) -> Round:
     user_id = verify_token(access_token, token_type="access")
     if not user_id:
