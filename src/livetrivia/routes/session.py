@@ -170,7 +170,7 @@ async def refresh_access_token(
     session.access_token = new_access_token
     session.access_token_expires_at = access_token_expires_at
     sql.add(session)
-    await session.commit()
+    await sql.commit()
 
     return TokenResponse(
         access_token=new_access_token,
@@ -259,15 +259,15 @@ async def delete_session(
         (Session.access_token == access_token) & (Session.user_id == user_id)
     )
     result = await sql.execute(stmt)
-    db_session = result.scalars().first()
+    session = result.scalars().first()
 
-    if not db_session:
+    if not session:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Session not found",
         )
 
-    await sql.delete(db_session)
+    await sql.delete(session)
     await sql.commit()
 
 
