@@ -144,6 +144,7 @@ async def get_file_data(
         raise HTTPException(status_code=403, detail="forbidden")
     return file
 
+
 @router.get(
     "/data/", response_model=list[FileDataResponse], status_code=status.HTTP_200_OK
 )

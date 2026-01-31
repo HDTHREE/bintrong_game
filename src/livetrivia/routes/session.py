@@ -273,7 +273,9 @@ async def delete_session(
 
 async def get_current_user(access_token: str) -> uuid.UUID:
     """Verify access token and return user_id."""
-    user_id: uuid.UUID | None = verify_token(access_token, token_type="access", strict=False)
+    user_id: uuid.UUID | None = verify_token(
+        access_token, token_type="access", strict=False
+    )
     if not user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
