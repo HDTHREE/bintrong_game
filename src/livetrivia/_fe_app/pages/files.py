@@ -66,6 +66,7 @@ upload = dash.dcc.Upload(
     style={"marginBottom": "1rem"},
 )
 
+
 files_center = dmc.Center(
     dmc.Card(
         dmc.Stack(
@@ -76,13 +77,15 @@ files_center = dmc.Center(
                 download,
             ]
         ),
-        w="80vw",
-        h="100%",
+        w="100vw",
+        h="100vh",
+        style={"overflow": "hidden", "boxSizing": "border-box"},
     ),
     h="100vh",
+    style={"overflow": "hidden", "boxSizing": "border-box"},
 )
 
-layout = dmc.AppShellMain(children=files_center)
+layout = dmc.AppShellMain(children=files_center, style={"width": "100vw", "height": "100vh", "overflow": "hidden", "boxSizing": "border-box"})
 
 register_page(
     getmod(__name__),
