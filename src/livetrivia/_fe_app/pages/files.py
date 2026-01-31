@@ -85,7 +85,15 @@ files_center = dmc.Center(
     style={"overflow": "hidden", "boxSizing": "border-box"},
 )
 
-layout = dmc.AppShellMain(children=files_center, style={"width": "100vw", "height": "100vh", "overflow": "hidden", "boxSizing": "border-box"})
+layout = dmc.AppShellMain(
+    children=files_center,
+    style={
+        "width": "100vw",
+        "height": "100vh",
+        "overflow": "hidden",
+        "boxSizing": "border-box",
+    },
+)
 
 register_page(
     getmod(__name__),

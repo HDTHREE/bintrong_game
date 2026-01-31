@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, status, UploadFile, File as FormFile
-from pydantic import BaseModel
 import uuid
 
 from livetrivia.db import get_sql_session, get_s3_client, BUCKET_NAME
