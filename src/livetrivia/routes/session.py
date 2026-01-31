@@ -91,7 +91,7 @@ async def login(
 ) -> TokenResponse:
     """Login a user and create 2 JWT session tokens."""
     stmt = select(User).where(User.email == login_data.email)
-    result = await sql.session.execute(stmt)
+    result = await sql.execute(stmt)
     user = result.scalars().first()
 
     if not user or not verify_password(login_data.password, user.password):
@@ -186,7 +186,7 @@ async def logout(
     sql: sqlas.AsyncSession = Depends(get_sql_session),
 ) -> dict:
     """Disables a session. Sets flag to false."""
-    user_id = verify_token(access_token, token_type="access")
+    user_id = verify_token(access_token, token_type="access", strict=False)
     if not user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -248,7 +248,7 @@ async def delete_session(
     sql: sqlas.AsyncSession = Depends(get_sql_session),
 ) -> None:
     """Delete a session record."""
-    user_id = verify_token(access_token, token_type="access")
+    user_id = verify_token(access_token, token_type="access", strict=False)
     if not user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -273,7 +273,7 @@ async def delete_session(
 
 async def get_current_user(access_token: str) -> uuid.UUID:
     """Verify access token and return user_id."""
-    user_id: uuid.UUID | None = verify_token(access_token, token_type="access")
+    user_id: uuid.UUID | None = verify_token(access_token, token_type="access", strict=False)
     if not user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

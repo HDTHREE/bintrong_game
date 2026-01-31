@@ -24,9 +24,7 @@ class Game(SQLModel, table=True):
     started_at: datetime | None = None
     ended_at: datetime | None = None
 
-    host_session: "Session" = Relationship(
-        sa_relationship_kwargs={"foreign_keys": ["Game.host_session_id"]}
-    )
+    host_session: "Session" = Relationship()
     player_sessions: list["GamePlayer"] = Relationship(back_populates="game")
 
 

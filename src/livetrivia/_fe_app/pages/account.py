@@ -4,7 +4,7 @@ import dash.exceptions as de
 import aiohttp
 import dash_mantine_components as dmc
 from livetrivia.utils import getenvs, getmod
-from livetrivia._fe_app.components import user_store, token_store
+from livetrivia._fe_app.components import user_store, token_store, url
 
 display_email = dmc.TextInput(
     label="Email",
@@ -66,18 +66,18 @@ app.clientside_callback(
 
 
 @app.callback(
-    dash.Output(user_store, "data", allow_duplicate=True),
-    dash.Output(token_store, "data", allow_duplicate=True),
     dash.Input(sign_out_button, "n_clicks"),
     dash.State(token_store, "data"),
+    running=[
+        (dash.Output(user_store, "data", allow_duplicate=True), None, None),
+        (dash.Output(token_store, "data", allow_duplicate=True), None, None),
+    ],
     prevent_initial_call=True,
 )
 async def on_signout(n_clicks: int | None, token: dict):
     # This will fire on page load (regardless of the value of prevent_initial_call) so check if `None` for first trigger.
-    if n_clicks is None:
+    if n_clicks is None or not token or not token.get("access_token"):
         raise de.PreventUpdate()
-    if not token or not token.get("access_token"):
-        return None, None
     params = {"access_token": token["access_token"]}
     async with (
         aiohttp.ClientSession(BACKEND_URL) as session,
@@ -89,4 +89,3 @@ async def on_signout(n_clicks: int | None, token: dict):
             (*_,) = await asyncio.gather(
                 logout_response.json(), delete_session_response.json()
             )
-    return None, None

@@ -18,6 +18,4 @@ class Round(SQLModel, table=True):
     started_at: datetime | None = None
     ended_at: datetime | None = None
 
-    game: "Game" = Relationship(
-        sa_relationship_kwargs={"foreign_keys": ["Round.game_id"]}
-    )
+    game: "Game" = Relationship()

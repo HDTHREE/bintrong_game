@@ -8,3 +8,6 @@ user_store = dcc.Store("user", "local")
 
 
 interval = dcc.Interval("interval", 1.8e5)
+
+
+url = dcc.Location(id="url")
