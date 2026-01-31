@@ -5,7 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "httpx>=0.28.1",
+    "aiohttp>=3.13.3",
     "lazy-loader>=0.4",
     "python-dotenv>=1.2.1",
     "sqlmodel>=0.0.27",
@@ -27,7 +27,6 @@ backend = [
     "types-aioboto3[essential]>=15.5.0",
 ]
 frontend = [
-    "aiohttp>=3.13.3",
     "dash-ag-grid>=32.3.2",
     "dash-iconify>=0.1.2",
     "dash-mantine-components>=2.4.0",
