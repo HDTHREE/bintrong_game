@@ -1,3 +1,4 @@
+from pydantic import BaseModel
 import typing_extensions as tp
 from sqlmodel import Field, SQLModel, Relationship
 import uuid
@@ -14,3 +15,12 @@ class File(SQLModel, table=True):
     prefix: str
 
     user: "User" = Relationship(back_populates="files")
+
+
+class FileDataResponse(BaseModel):
+    id: uuid.UUID
+    prefix: str
+    user_id: uuid.UUID
+
+    class Config:
+        from_attributes = True

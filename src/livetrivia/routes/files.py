@@ -3,7 +3,7 @@ from pydantic import BaseModel
 import uuid
 
 from livetrivia.db import get_sql_session, get_s3_client, BUCKET_NAME
-from livetrivia.models.files import File
+from livetrivia.models.files import File, FileDataResponse
 from livetrivia.routes.session import get_current_user
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
@@ -17,25 +17,7 @@ if tp.TYPE_CHECKING:
 router: APIRouter = APIRouter(prefix="/files", tags=["files"])
 
 
-class FileResponse(BaseModel):
-    id: uuid.UUID
-    prefix: str
-    user_id: uuid.UUID
-
-    class Config:
-        from_attributes = True
-
-
-class FileDataResponse(BaseModel):
-    id: uuid.UUID
-    prefix: str
-    user_id: uuid.UUID
-
-    class Config:
-        from_attributes = True
-
-
-@router.post("/", response_model=FileResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=FileDataResponse, status_code=status.HTTP_201_CREATED)
 async def upload_file(
     user_id: uuid.UUID = Depends(get_current_user),
     file: UploadFile = FormFile(...),
