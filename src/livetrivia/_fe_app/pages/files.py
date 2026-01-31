@@ -1,10 +1,10 @@
 import dash
-import typing_extensions as tp
+import base64
+import dash_iconify as di
 import dash.exceptions as de
 import dash_mantine_components as dmc
 import dash_ag_grid as dag
 import aiohttp
-from dash import ctx
 from livetrivia.utils import getmod, getenvs
 from livetrivia._fe_app.components import token_store, user_store
 
@@ -60,11 +60,18 @@ grid = dag.AgGrid(
 download = dash.dcc.Download()
 
 
+upload = dash.dcc.Upload(
+    children=dmc.Button("Upload File", leftSection=di.DashIconify(icon="ph:upload")),
+    multiple=False,
+    style={"marginBottom": "1rem"},
+)
+
 files_center = dmc.Center(
     dmc.Card(
         dmc.Stack(
             [
                 dmc.Title("Your Files", order=2),
+                upload,
                 grid,
                 download,
             ]
@@ -104,7 +111,6 @@ async def update_files_grid(_: dict, token):
         return data
 
 
-
 @app.callback(
     dash.Output(grid, "rowData", allow_duplicate=True),
     dash.Output(download, "data"),
@@ -114,10 +120,12 @@ async def update_files_grid(_: dict, token):
     dash.State(token_store, "data"),
     prevent_initial_call=True,
 )
-async def handle_file_action(render_data: dict, row_data: list[dict], user: str, token: dict):
+async def handle_file_action(
+    render_data: dict, row_data: list[dict], user: str, token: dict
+):
     if not render_data or not token or not token.get("access_token"):
         raise de.PreventUpdate()
-    row_id: int = int(render_data.get("rowId")) # TODO this might need to be rowIndex
+    row_id: int = int(render_data.get("rowId"))
     action: str = str(render_data.get("colId"))
 
     access_token: str = str(token["access_token"])
@@ -151,3 +159,34 @@ async def handle_file_action(render_data: dict, row_data: list[dict], user: str,
                 raise de.PreventUpdate()
             data: dict = await resp.json()
             return data, download_data
+
+
+@app.callback(
+    dash.Output(grid, "rowData", allow_duplicate=True),
+    dash.Input(upload, "contents"),
+    dash.State(upload, "filename"),
+    dash.State(token_store, "data"),
+    prevent_initial_call=True,
+)
+async def upload_file(contents, filename, token: dict):
+    if not contents or not filename or not token or not token.get("access_token"):
+        raise de.PreventUpdate()
+    header, b64data = contents.split(",", 1)
+    file_bytes = base64.b64decode(b64data)
+    access_token = token["access_token"]
+    params = {"access_token": access_token}
+    async with aiohttp.ClientSession(BACKEND_URL) as session:
+        form = aiohttp.FormData()
+        form.add_field(
+            "file",
+            file_bytes,
+            filename=filename,
+            content_type="application/octet-stream",
+        )
+        async with session.post("api/files/", data=form, params=params) as resp:
+            if resp.status != 201:
+                raise de.PreventUpdate()
+        async with session.get("api/files/data/", params=params) as resp:
+            if resp.status != 200:
+                raise de.PreventUpdate()
+            return await resp.json()

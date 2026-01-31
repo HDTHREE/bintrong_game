@@ -6,7 +6,7 @@ globalThis.dashAgGridFunctions = {
 globalThis.dashAgGridComponentFunctions = {
 	// Adapted from: https://www.dash-mantine-components.com/dash-ag-grid#example-2:-buttons
 	dmcButton(props) {
-		const {setData, data} = props;
+		const {setData} = props;
 
 		function onClick() {
 			setData();
