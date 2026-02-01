@@ -5,13 +5,18 @@ from livetrivia.utils import retry_with_backoff
 
 api: yt.YouTubeTranscriptApi = yt.YouTubeTranscriptApi()
 
+async def get_yt_api():
+    yield api
+
+YOUTUBE_VIDEO_PREFIX: str = "https://www.youtube.com/watch?v="
+
 
 @retry_with_backoff(
     exceptions_to_catch=yt.YouTubeTranscriptApiException,
     logger=getattr(threading.local(), "LOGGER", None),
 )
 def _get_youtube_transcript(url: str) -> str:
-    *_, id = url.strip().split("https://www.youtube.com/watch?v=")
+    *_, id = url.strip().split(YOUTUBE_VIDEO_PREFIX)
     data: list[dict[str, str | float]] = api.fetch(id).to_raw_data()
     return " ".join(map(lambda d: d["text"], data)).strip()
 

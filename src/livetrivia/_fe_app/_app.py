@@ -141,26 +141,30 @@ def on_navigate(url: str | None, token: dict | None, user: str | None):
 
 @app.callback(
     dash.Output(token_store, "data", allow_duplicate=True),
+    dash.Output(user_store, "data", allow_duplicate=True),
+    dash.Input(url, "pathname"),
     dash.Input(token_store, "data"),
     dash.State(user_store, "id"),
     dash.Input(interval, "n_intervals"),
     dash.State(interval, "id"),
 )
-async def on_refresh(token: dict, email: str | None, _: int, id: str):
+async def on_refresh(_: str | None, token: dict, email: str | None, __: int, id: str):
     if dash.ctx.triggered_id != id and token:
         raise de.PreventUpdate()
     async with aiohttp.ClientSession(BACKEND_URL) as session:
-        # Get a guest (no email) session if no email.
+        # Get a guest session if no email.
         if not email or not token:
             async with session.post("api/sessions/guest") as session_response:
-                return await session_response.json()
-        # Otherwise, use refresh the existing session.
-        params = {"refresh_token": token["refresh_token"]}
-        async with session.post(
-            "api/sessions/refresh", params=params
-        ) as session_response:
-            # TODO logout if this shit fails
-            return await session_response.json()
+                return await session_response.json(), dash.no_update
+        # Otherwise, use refresh the session.
+        try:
+            params = {"refresh_token": token["refresh_token"]}
+            async with session.post(
+                "api/sessions/refresh", params=params
+            ) as session_response:
+                return await session_response.json(), dash.no_update
+        except:
+            return None, None
 
 
 if __name__ == "__main__":
