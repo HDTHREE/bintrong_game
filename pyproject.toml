@@ -25,6 +25,7 @@ backend = [
     "pyjwt>=2.10.1",
     "aioboto3>=15.5.0",
     "types-aioboto3[essential]>=15.5.0",
+    "openai>=2.16.0",
 ]
 frontend = [
     "dash-ag-grid>=32.3.2",

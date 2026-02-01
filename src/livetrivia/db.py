@@ -13,11 +13,11 @@ if tp.TYPE_CHECKING:
     import types_aiobotocore_s3 as aiob3t
 
 
-SQLITE_URL, S3_URL, S3_REGION, BUCKET_NAME = getenvs()
+SQL_URL, S3_URL, S3_REGION, BUCKET_NAME = getenvs()
 
 
 async def get_sql_engine(
-    url: str = Depends(lambda: SQLITE_URL),
+    url: str = Depends(lambda: SQL_URL),
 ) -> tp.AsyncGenerator[sqlas.AsyncEngine]:
     yield sqlas.create_async_engine(url)
 
@@ -63,6 +63,6 @@ async def lifespan(_: "FastAPI") -> tp.AsyncGenerator[None, None]:
         p1 = s3.create_bucket(Bucket=BUCKET_NAME)
 
     get_sql_engine_context = asynccontextmanager(get_sql_engine)
-    async with get_sql_engine_context(SQLITE_URL) as engine, engine.begin() as conn:
+    async with get_sql_engine_context(SQL_URL) as engine, engine.begin() as conn:
         await asyncio.gather(p1, conn.run_sync(SQLModel.metadata.create_all))
         yield

@@ -8,9 +8,16 @@ import types_aiobotocore_s3 as aiob3t
 import aiohttp
 from livetrivia.utils import getenvs
 
+import openai as ai
+
 SGLANG_URL: str = getenvs()
 
 router: APIRouter = APIRouter(prefix="/generate", tags=["generate"])
+
+
+
+async def get_ai_client(base_url: str = Depends(lambda: SGLANG_URL)):
+    yield ai.AsyncClient(base_url=base_url, api_key="dummy")
 
 
 @router.post(
@@ -18,9 +25,11 @@ router: APIRouter = APIRouter(prefix="/generate", tags=["generate"])
 )
 async def generate_anki_from_file(
     file_id: uuid.UUID,
+    cloze: bool = False,
     user_id: uuid.UUID = Depends(get_current_user),
     sql: sqlas.AsyncSession = Depends(get_sql_session),
     s3: aiob3t.S3Client = Depends(get_s3_client),
+    ai: ai.AsyncClient = Depends(get_ai_client)
 ):
     file = await sql.get(File, file_id)
     if not file:

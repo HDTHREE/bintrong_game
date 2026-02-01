@@ -2,22 +2,31 @@ version: '3.8'
 
 services:
   sglang:
-    build:
-      context: .
-      dockerfile: Dockerfile.sglang
-    image: mistral-7b-sglang:fp8-tp8
-    ports:
-      - "30000:30000"
+    image: lmsysorg/sglang:dev
+    container_name: sglang_server
+    command: >
+      python -m sglang.launch_server
+      --model /local/mistral-7b
+      --tp 1
+      --quantization fp8
+      --attention-backend triton
+      --host 0.0.0.0
+      --port 30000
     volumes:
       - ./models/mistral-7b:/local/mistral-7b:ro
-    shm_size: "1g"
-    gpus: all
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:30000/v1/models"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    restart: unless-stopped
+    shm_size: 32g
+    ipc: host
+    network_mode: host
+    privileged: true
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    stdin_open: true
+    tty: true
 
   localstack:
     image: localstack/localstack:latest
