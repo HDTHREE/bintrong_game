@@ -1,3 +1,5 @@
+import aiohttp
+import json
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel
 from sqlmodel import select
@@ -12,7 +14,6 @@ from livetrivia.utils import getenvs
 from livetrivia.models.files import File
 
 import typing_extensions as tp
-import openai as ai
 
 if tp.TYPE_CHECKING:
     import youtube_transcript_api as yt
@@ -44,7 +45,6 @@ Be sure to be exhaustive. Cover as much as you can, do not stop when your output
 
 MESSAGE TO PROCESS:
 
-Insert video link, transcript, or text here
 """
 
 CLOZE_PROMPT = """
@@ -74,20 +74,7 @@ Be sure to be exhaustive. Cover as much as you can, do not stop when your output
 
 MESSAGE TO PROCESS:
 
-Insert video link, transcript, or text here
 """
-
-
-
-
-
-
-
-
-
-
-async def get_ai_client(base_url: str = Depends(lambda: SGLANG_URL)):
-    yield ai.AsyncClient(base_url=base_url, api_key="dummy")
 
 
 
@@ -95,7 +82,7 @@ class YouTubeBody(BaseModel):
     video: str
 
     @property
-    def file_id():
+    def file_id(self):
         return None
 
 
@@ -103,7 +90,7 @@ class FileBody(BaseModel):
     file_id: uuid.UUID
 
     @property
-    def video():
+    def video(self):
         return None
 
 
@@ -112,22 +99,35 @@ class GenerateRequest(BaseModel):
     cloze: bool
 
 
+async def get_gen_api(url: str = Depends(lambda: SGLANG_URL)):
+    yield aiohttp.ClientSession(base_url=url)
+
+
+
 @router.post("/", response_model=FileDataResponse, status_code=status.HTTP_201_CREATED)
 async def generate_anki(
     generate: GenerateRequest,
     user_id: uuid.UUID = Depends(get_current_user),
     sql: sqlas.AsyncSession = Depends(get_sql_session),
     s3: aiob3t.S3Client = Depends(get_s3_client),
-    ai: ai.AsyncClient = Depends(get_ai_client),
-    yt: "yt.YouTubeTranscriptApi" = Depends(get_yt_api)
+    yt: "yt.YouTubeTranscriptApi" = Depends(get_yt_api),
+    gen: aiohttp.ClientSession = Depends(get_gen_api)
 ):
     if generate.input.video:
-        id = generate.input.strip().split(YOUTUBE_VIDEO_PREFIX)
-        content = yt.fetch(video_id=id).to_raw_data()["text"]
+        id = generate.input.video.strip().split(YOUTUBE_VIDEO_PREFIX)
+        content = json.dumps(yt.fetch(video_id=id).to_raw_data())
     else:
         file_id = generate.input.file_id
-        stmt = select(File).where(File.id == file_id)
+        stmt = select(File).where((File.id == file_id) & (File.user_id == user_id))
         result = await sql.execute(stmt)
         file = result.scalars().first()
-        content = s3.get_object(Bucket=BUCKET_NAME, Key=file.prefix)
+        # TODO get content
+
+    prompt=CLOZE_PROMPT if generate.cloze else PROMPT
+    async with gen.post("generate", json={"text": prompt + content}) as generate_response:
+        body = await generate_response.json()
+        print(body)
+
+    raise RuntimeError()
+
 
