@@ -1,15 +1,13 @@
 import aiohttp
 import json
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlmodel import select
 from livetrivia.models.files import FileDataResponse
 from livetrivia.routes.session import get_current_user
 from livetrivia.db import get_sql_session, get_s3_client, BUCKET_NAME
 import uuid
-import sqlalchemy.ext.asyncio as sqlas
-import types_aiobotocore_s3 as aiob3t
-from livetrivia.text_extraction import YOUTUBE_VIDEO_PREFIX, get_yt_api
+from livetrivia.text_extraction import YOUTUBE_VIDEO_PREFIX, get_yt_api, get_docx_text, get_pdf_text
 from livetrivia.utils import getenvs
 from livetrivia.models.files import File
 
@@ -17,6 +15,8 @@ import typing_extensions as tp
 
 if tp.TYPE_CHECKING:
     import youtube_transcript_api as yt
+    import types_aiobotocore_s3 as aiob3t
+    import sqlalchemy.ext.asyncio as sqlas
 
 SGLANG_URL: str = getenvs()
 
@@ -94,39 +94,49 @@ class FileBody(BaseModel):
         return None
 
 
-class GenerateRequest(BaseModel):
-    input: YouTubeBody | FileBody
-    cloze: bool
-
-
 async def get_gen_api(url: str = Depends(lambda: SGLANG_URL)):
     yield aiohttp.ClientSession(base_url=url)
 
 
 
+async def get_gen_text(
+    input: YouTubeBody | FileBody,
+    user_id: uuid.UUID = Depends(get_current_user),
+    yt: "yt.YouTubeTranscriptApi" = Depends(get_yt_api),
+    s3: "aiob3t.S3Client" = Depends(get_s3_client),
+    sql: "sqlas.AsyncSession" = Depends(get_sql_session),
+) -> str:
+    if input.file_id is not None:
+        file = await sql.get(File, input.file_id)
+        if not file:
+            raise HTTPException(status_code=404, detail="file not found")
+        if file.user_id != user_id:
+            raise HTTPException(status_code=403, detail="forbidden")
+        *_, ext = file.prefix.split(".")
+        if ext == ".anki" or ext not in {".docx",".pdf",".txt"}:
+            raise HTTPException(status_code=422, detail="unprocessable body")
+        # Get the bytes of the file
+        resp = await s3.get_object(Bucket=BUCKET_NAME, Key=file.prefix)
+        file_bytes = await resp.get("Body").read()
+
+        # Parse the file based on extension.
+        get_text: tp.Callable[[bytes], str] = {".txt": bytes.decode, ".pdf": get_pdf_text, ".docx": get_docx_text}.get(ext)
+        return get_text(file_bytes)
+
+    # Get youtube script text.
+    *_, id = input.video.strip().split(YOUTUBE_VIDEO_PREFIX)
+    data = yt.fetch(id).to_raw_data()
+    return json.dumps(data)
+
+
 @router.post("/", response_model=FileDataResponse, status_code=status.HTTP_201_CREATED)
 async def generate_anki(
-    generate: GenerateRequest,
+    cloze: bool = False,
+    text: str = Depends(get_gen_text),
     user_id: uuid.UUID = Depends(get_current_user),
-    sql: sqlas.AsyncSession = Depends(get_sql_session),
-    s3: aiob3t.S3Client = Depends(get_s3_client),
-    yt: "yt.YouTubeTranscriptApi" = Depends(get_yt_api),
+    sql: "sqlas.AsyncSession" = Depends(get_sql_session),
     gen: aiohttp.ClientSession = Depends(get_gen_api)
 ):
-    if generate.input.video:
-        id = generate.input.video.strip().split(YOUTUBE_VIDEO_PREFIX)
-        content = json.dumps(yt.fetch(video_id=id).to_raw_data())
-    else:
-        file_id = generate.input.file_id
-        stmt = select(File).where((File.id == file_id) & (File.user_id == user_id))
-        result = await sql.execute(stmt)
-        file = result.scalars().first()
-        # TODO get content
-
-    prompt=CLOZE_PROMPT if generate.cloze else PROMPT
-    async with gen.post("generate", json={"text": prompt + content}) as generate_response:
-        body = await generate_response.json()
-        print(body)
 
     raise RuntimeError()
 
