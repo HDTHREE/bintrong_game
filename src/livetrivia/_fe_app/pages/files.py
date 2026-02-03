@@ -8,7 +8,6 @@ import aiohttp
 from livetrivia.utils import getmod, getenvs
 from livetrivia._fe_app.components import token_store, user_store
 
-register_page = dash.register_page
 
 app: dash.Dash = dash.get_app()
 
@@ -28,7 +27,7 @@ grid = dag.AgGrid(
             "headerName": "Delete",
             "cellRenderer": "dmcButton",
             "cellRendererParams": {
-                "rightIcon": "ph:trash",
+                "rightIcon": "ic:round-delete",
                 "value": "Delete",
                 "color": "red",
             },
@@ -40,7 +39,7 @@ grid = dag.AgGrid(
             "headerName": "Download",
             "cellRenderer": "dmcButton",
             "cellRendererParams": {
-                "rightIcon": "ph:download",
+                "rightIcon": "ic:round-file-download",
                 "value": "Download",
             },
             "field": "user_id",
@@ -61,7 +60,7 @@ download = dash.dcc.Download()
 
 
 upload = dash.dcc.Upload(
-    children=dmc.Button("Upload File", leftSection=di.DashIconify(icon="ph:upload")),
+    children=dmc.Button("Upload File", leftSection=di.DashIconify(icon="ic:round-file-upload")),
     multiple=False,
     style={"marginBottom": "1rem"},
 )
@@ -95,7 +94,7 @@ layout = dmc.AppShellMain(
     },
 )
 
-register_page(
+dash.register_page(
     getmod(__name__),
     path="/files",
     layout=layout,

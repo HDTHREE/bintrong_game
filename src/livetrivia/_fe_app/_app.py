@@ -46,28 +46,28 @@ files_page = dash.page_registry["files"]
 home_link = dmc.NavLink(
     label=dmc.Text(home_page["name"], w=170),
     href=home_page["path"],
-    leftSection=di.DashIconify(icon="bi:house-door-fill"),
+    leftSection=di.DashIconify(icon="ic:round-home"),
 )
 
 
 join_link = dmc.NavLink(
     label=dmc.Text(join_page["name"], w=170),
     href=join_page["path"],
-    leftSection=di.DashIconify(icon="tabler:activity"),
+    leftSection=di.DashIconify(icon="ic:round-connect-without-contact"),
 )
 
 
 login_link = dmc.NavLink(
     label=dmc.Text(login_page["name"], w=170),
     href=login_page["path"],
-    leftSection=di.DashIconify(icon="tabler:activity"),
+    leftSection=di.DashIconify(icon="ic:round-login"),
 )
 
 
 files_link = dmc.NavLink(
     label=dmc.Text(files_page["name"], w=170),
     href=files_page["path"],
-    leftSection=di.DashIconify(icon="tabler:activity"),
+    leftSection=di.DashIconify(icon="ic:round-drive-file-move"),
 )
 
 
