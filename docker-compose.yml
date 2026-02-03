@@ -7,6 +7,7 @@ services:
     command: >
       python -m sglang.launch_server
       --model /local/mistral-7b
+      --context-length 32000
       --tp 1
       --quantization fp8
       --attention-backend triton

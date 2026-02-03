@@ -12,7 +12,7 @@ class File(SQLModel, table=True):
     user_id: uuid.UUID = Field(foreign_key="user.id")
     generated_from_id: uuid.UUID | None = Field(foreign_key="file.id")
 
-    prefix: str
+    prefix: str = Field(unique=True)
 
     user: "User" = Relationship(back_populates="files")
 

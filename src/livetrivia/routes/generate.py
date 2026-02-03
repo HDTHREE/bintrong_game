@@ -1,7 +1,8 @@
+import asyncio
 import aiohttp
 import json
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, PrivateAttr
 from sqlmodel import select
 from livetrivia.models.files import FileDataResponse
 from livetrivia.routes.session import get_current_user
@@ -17,6 +18,7 @@ if tp.TYPE_CHECKING:
     import youtube_transcript_api as yt
     import types_aiobotocore_s3 as aiob3t
     import sqlalchemy.ext.asyncio as sqlas
+    from pydantic import ConfigDict
 
 SGLANG_URL: str = getenvs()
 
@@ -79,15 +81,25 @@ MESSAGE TO PROCESS:
 
 
 class YouTubeBody(BaseModel):
-    video: str
+    """Request body for `/api/generate/`. Allows for generation of anki deck based on youtube URL."""
 
-    @property
-    def file_id(self):
-        return None
+    model_config: "ConfigDict" = {"arbitrary_types_allowed": True}
+    """Model config needed to set this class to be mutuable within `get_gen_text`"""
+
+    video: str
+    """URL of video. Can include full-url or video id."""
+
+    cloze: bool
+    """Whether or not to generate an anki cloze (fill-in-blank)."""
+
+    file_id: uuid.UUID | None = None
+    """**OMIT:** Modified inplace within dependency."""
 
 
 class FileBody(BaseModel):
+    """Request body for `/api/generate/`. Allows for generation of anki deck based on existing file object."""
     file_id: uuid.UUID
+    cloze: bool
 
     @property
     def video(self):
@@ -115,29 +127,123 @@ async def get_gen_text(
         *_, ext = file.prefix.split(".")
         if ext == ".anki" or ext not in {".docx",".pdf",".txt"}:
             raise HTTPException(status_code=422, detail="unprocessable body")
-        # Get the bytes of the file
+
         resp = await s3.get_object(Bucket=BUCKET_NAME, Key=file.prefix)
-        file_bytes = await resp.get("Body").read()
+        file_bytes = await resp["Body"].read()
 
         # Parse the file based on extension.
         get_text: tp.Callable[[bytes], str] = {".txt": bytes.decode, ".pdf": get_pdf_text, ".docx": get_docx_text}.get(ext)
-        return get_text(file_bytes)
+        
+        # TODO: cache this step somehow gl.
+        text = get_text(file_bytes)
+
+        return text
 
     # Get youtube script text.
-    *_, id = input.video.strip().split(YOUTUBE_VIDEO_PREFIX)
-    data = yt.fetch(id).to_raw_data()
-    return json.dumps(data)
+    *_, video_id = input.video.strip().split(YOUTUBE_VIDEO_PREFIX)
+
+    # Use video ID in prefix so we can check for existing transcripts
+    script_prefix = f"{user_id}/scripts/{video_id}/transcript.json"
+
+    # Check if transcript already exists in database.
+    existing_file = (await sql.execute(
+        select(File).where(File.prefix == script_prefix)
+    )).scalar_one_or_none()
+
+    if existing_file is not None:
+        # Transcript exists, fetch.
+        resp = await s3.get_object(Bucket=BUCKET_NAME, Key=script_prefix)
+        text = (await resp["Body"].read()).decode("utf-8")
+        input.file_id = existing_file.id
+        return text
+
+    # Transcript not found, fetch.
+    video = yt.fetch(video_id)
+    data = video.to_raw_data()
+    text = "\n".join(d.get("text", "") for d in data).strip()
+
+    script_id = uuid.uuid4()
+
+    script_file = File(
+        id=script_id,
+        prefix=script_prefix,
+        user_id=user_id,
+        generated_from_id=None,
+    )
+
+    input.file_id = script_file.id
+
+    await s3.put_object(
+        Bucket=BUCKET_NAME,
+        Key=script_prefix,
+        Body=text.encode("utf-8"),
+        ContentType="application/json",
+    )
+
+    sql.add(script_file)
+    await sql.commit()
+    await sql.refresh(script_file)
+
+    return text
 
 
 @router.post("/", response_model=FileDataResponse, status_code=status.HTTP_201_CREATED)
 async def generate_anki(
-    cloze: bool = False,
+    input: YouTubeBody | FileBody,
     text: str = Depends(get_gen_text),
     user_id: uuid.UUID = Depends(get_current_user),
     sql: "sqlas.AsyncSession" = Depends(get_sql_session),
+    s3: "aiob3t.S3Client" = Depends(get_s3_client),
     gen: aiohttp.ClientSession = Depends(get_gen_api)
-):
+) -> File:
 
-    raise RuntimeError()
+    # Select the appropriate prompt based on cloze parameter
+    prompt = CLOZE_PROMPT if input.cloze else PROMPT
+
+    full_prompt = prompt + text
+
+    payload = {
+        "text": full_prompt,
+        "sampling_params": {
+            "temperature": 0.7,
+        },
+    }
+
+    # TODO add constrained decoding
+
+    async with gen.post("/generate", json=payload) as resp:
+        if resp.status != 200:
+            error_text = await resp.text()
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Generation API error: {error_text}"
+            )
+        result = await resp.json()
+
+    generated_content = result.get("Body")
+
+    file_id = uuid.uuid4()
+    card_type = "cloze" if input.cloze else "basic"
+    filename = f"anki_{card_type}_{file_id}.txt"
+    prefix = f"{user_id}/generated/{file_id}/{filename}"
+
+    await s3.put_object(
+        Bucket=BUCKET_NAME,
+        Key=prefix,
+        Body=generated_content.encode("utf-8"),
+        ContentType="text/plain",
+    )
+
+    new_file = File(
+        id=file_id,
+        prefix=prefix,
+        user_id=user_id,
+        generated_from_id=input.script_file_id,
+    )
+    sql.add(new_file)
+    await sql.commit()
+    await sql.refresh(new_file)
+
+    return new_file
 
 
