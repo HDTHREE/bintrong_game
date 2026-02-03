@@ -16,7 +16,6 @@ services:
       - ./models/mistral-7b:/local/mistral-7b:ro
     shm_size: 32g
     ipc: host
-    network_mode: host
     privileged: true
     deploy:
       resources:
