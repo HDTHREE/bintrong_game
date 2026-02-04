@@ -84,3 +84,20 @@ gantt
 | 16 | Develop and integrate frontend to serve the game client embedded | Medium | Hayden |
 | 17 | Integrate backend API to spawn game servers (kubernetes / docker) | High | Hayden |
 | 18 | Figure out production deployment and proxy | High | Hayden |
+
+
+### Completion
+**04/02/2026** -
+The following tasks have been completed with the corresponding notes describing any plan deviation or challenge.
+
+- 1:
+  - Parameters can be configured (not sure what else would be modified but whatever).
+  - Production deployment can use better models.
+- 2:
+  - guest session to allow non-logged-in players to join (rejoin) games.
+  - Using 2 token approach (access + refresh).
+- 3 - 5
+- 6: Prompts need rewritten (more consise)
+- 7
+- 8: *deck generation is WIP*
+
