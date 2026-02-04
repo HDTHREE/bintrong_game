@@ -220,12 +220,15 @@ async def generate_anki(
             )
         result = await resp.json()
 
-    generated_content = result.get("Body")
+    generated_content = result.get("text")
 
     file_id = uuid.uuid4()
     card_type = "cloze" if input.cloze else "basic"
     filename = f"anki_{card_type}_{file_id}.txt"
     prefix = f"{user_id}/generated/{file_id}/{filename}"
+
+    # Create in memory file and upload the bytes to s3
+    # TODO
 
     await s3.put_object(
         Bucket=BUCKET_NAME,
@@ -234,11 +237,14 @@ async def generate_anki(
         ContentType="text/plain",
     )
 
+    if input.file_id is None:
+        raise HTTPException(404)
+
     new_file = File(
         id=file_id,
         prefix=prefix,
         user_id=user_id,
-        generated_from_id=input.script_file_id,
+        generated_from_id=input.file_id,
     )
     sql.add(new_file)
     await sql.commit()

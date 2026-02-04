@@ -19,6 +19,14 @@ SQL_URL, S3_URL, S3_REGION, BUCKET_NAME = getenvs()
 async def get_sql_engine(
     url: str = Depends(lambda: SQL_URL),
 ) -> tp.AsyncGenerator[sqlas.AsyncEngine]:
+    yield _get_sql_engine(url=url)
+
+
+async def new_memory_sql_engine() -> tp.AsyncGenerator[sqlas.AsyncEngine]:
+    yield _get_sql_engine(url=":memory:")
+
+
+async def _get_sql_engine(url: str) -> tp.AsyncGenerator[sqlas.AsyncEngine]:
     yield sqlas.create_async_engine(url)
 
 
@@ -60,9 +68,9 @@ async def lifespan(_: "FastAPI") -> tp.AsyncGenerator[None, None]:
         get_s3_session_context() as aws_session,
         get_s3_client_context(S3_URL, S3_REGION, aws_session) as s3,
     ):
-        p1 = s3.create_bucket(Bucket=BUCKET_NAME)
+        await s3.create_bucket(Bucket=BUCKET_NAME)
 
     get_sql_engine_context = asynccontextmanager(get_sql_engine)
     async with get_sql_engine_context(SQL_URL) as engine, engine.begin() as conn:
-        await asyncio.gather(p1, conn.run_sync(SQLModel.metadata.create_all))
+        await conn.run_sync(SQLModel.metadata.create_all)
         yield
