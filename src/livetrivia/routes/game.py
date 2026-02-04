@@ -187,6 +187,8 @@ async def start_game(
     await sql.commit()
     await sql.refresh(game)
 
+    # TODO This doesn't actually start a game.
+
     return game
 
 
@@ -243,6 +245,8 @@ async def end_game(
     sql.add(game)
     await sql.commit()
     await sql.refresh(game)
+
+    # TODO This doesn't actually end (there isn't) anything.
 
     return game
 
