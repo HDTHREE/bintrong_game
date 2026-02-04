@@ -14,6 +14,7 @@ services:
       --attention-backend triton
       --chunked-prefill-size 4096
       --mem-fraction-static 0.8
+      --enable-torch-compile
       --host 0.0.0.0
       --port 30000
     volumes:

@@ -58,7 +58,7 @@ grid = dag.AgGrid(
 
 download = dash.dcc.Download()
 
-EXTS = ".anki",".docx",".pdf",".txt" # TODO This should prob be not based on extension and based on media groups
+EXTS = ".akpg",".docx",".pdf",".txt" # TODO This should prob be not based on extension and based on media groups
 
 
 upload = dash.dcc.Upload(

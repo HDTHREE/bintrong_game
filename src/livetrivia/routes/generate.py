@@ -1,12 +1,14 @@
-import asyncio
 import aiohttp
+import io
 import json
+import zipfile as zf
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, ConfigDict, PrivateAttr
+from pydantic import BaseModel, ConfigDict
 from sqlmodel import select
+from livetrivia.models.anki_deck import AnkiModel
 from livetrivia.models.files import FileDataResponse
 from livetrivia.routes.session import get_current_user
-from livetrivia.db import get_sql_session, get_s3_client, BUCKET_NAME
+from livetrivia.db import get_sql_session, get_s3_client, BUCKET_NAME, new_inmemory_anki_orm
 import uuid
 from livetrivia.text_extraction import YOUTUBE_VIDEO_PREFIX, get_yt_api, get_docx_text, get_pdf_text
 from livetrivia.utils import getenvs
@@ -125,7 +127,7 @@ async def get_gen_text(
         if file.user_id != user_id:
             raise HTTPException(status_code=403, detail="forbidden")
         *_, ext = file.prefix.split(".")
-        if ext == ".anki" or ext not in {".docx",".pdf",".txt"}:
+        if ext == ".akpg" or ext not in {".docx",".pdf",".txt"}:
             raise HTTPException(status_code=422, detail="unprocessable body")
 
         resp = await s3.get_object(Bucket=BUCKET_NAME, Key=file.prefix)
@@ -193,6 +195,7 @@ async def generate_anki(
     text: str = Depends(get_gen_text),
     user_id: uuid.UUID = Depends(get_current_user),
     sql: "sqlas.AsyncSession" = Depends(get_sql_session),
+    anki: "sqlas.AsyncSession" = Depends(new_inmemory_anki_orm),
     s3: "aiob3t.S3Client" = Depends(get_s3_client),
     gen: aiohttp.ClientSession = Depends(get_gen_api)
 ) -> File:
@@ -206,35 +209,51 @@ async def generate_anki(
         "text": full_prompt,
         "sampling_params": {
             "temperature": 0.7,
+            "max_new_tokens": 26000,
+            "json_schema": json.dumps(AnkiModel.model_json_schema())
         },
     }
 
-    # TODO add constrained decoding
-
-    async with gen.post("/generate", json=payload) as resp:
-        if resp.status != 200:
-            error_text = await resp.text()
+    async with gen.post("/generate", json=payload) as response:
+        if response.status != 200:
+            error_text = await response.text()
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail=f"Generation API error: {error_text}"
             )
-        result = await resp.json()
+        result = await response.json()
 
     generated_content = result.get("text")
+    validated_model: AnkiModel = AnkiModel.model_validate(generated_content)
 
     file_id = uuid.uuid4()
     card_type = "cloze" if input.cloze else "basic"
-    filename = f"anki_{card_type}_{file_id}.txt"
+    filename = f"{card_type}_{file_id}.apkg"
     prefix = f"{user_id}/generated/{file_id}/{filename}"
 
-    # Create in memory file and upload the bytes to s3
-    # TODO
+    await validated_model.add_to_sql(anki)
+
+    buffer = io.BytesIO()
+    def synchronous_dump(sync_conn) -> None:
+        nonlocal buffer
+        with open(buffer, "w") as file:
+            for line in sync_conn.iterdump():
+                file.write('%s\n' % line)
+        buffer.seek(0)
+
+    async with await anki.connection() as connection:
+        await connection.run_sync(synchronous_dump)
+
+    # Create an in-memory zip file with collection.anki2
+    with zf.ZipFile(zip_buffer := io.BytesIO(), "w", zf.ZIP_DEFLATED) as bundle:
+        bundle.writestr("collection.anki2", buffer.getvalue())
+    zip_buffer.seek(0)
 
     await s3.put_object(
         Bucket=BUCKET_NAME,
         Key=prefix,
-        Body=generated_content.encode("utf-8"),
-        ContentType="text/plain",
+        Body=zip_buffer.getvalue(),
+        ContentType="application/zip",
     )
 
     if input.file_id is None:
@@ -251,5 +270,3 @@ async def generate_anki(
     await sql.refresh(new_file)
 
     return new_file
-
-

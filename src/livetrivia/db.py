@@ -1,4 +1,3 @@
-import asyncio
 from contextlib import asynccontextmanager
 import aioboto3
 from sqlmodel import SQLModel
@@ -6,6 +5,7 @@ import typing_extensions as tp
 import sqlalchemy.ext.asyncio as sqlas
 import sqlalchemy.orm as sqlorm
 from livetrivia.utils import getenvs
+from livetrivia.models.anki_deck import create_anki_tables
 from fastapi import Depends
 
 if tp.TYPE_CHECKING:
@@ -19,11 +19,13 @@ SQL_URL, S3_URL, S3_REGION, BUCKET_NAME = getenvs()
 async def get_sql_engine(
     url: str = Depends(lambda: SQL_URL),
 ) -> tp.AsyncGenerator[sqlas.AsyncEngine]:
-    yield _get_sql_engine(url=url)
+    async for engine in _get_sql_engine(url=url):
+        yield engine
 
 
-async def new_memory_sql_engine() -> tp.AsyncGenerator[sqlas.AsyncEngine]:
-    yield _get_sql_engine(url=":memory:")
+async def new_inmemory_sql_engine() -> tp.AsyncGenerator[sqlas.AsyncEngine]:
+    async for engine in _get_sql_engine("sqlite+aiosqlite:///:memory:"):
+        yield engine
 
 
 async def _get_sql_engine(url: str) -> tp.AsyncGenerator[sqlas.AsyncEngine]:
@@ -33,6 +35,18 @@ async def _get_sql_engine(url: str) -> tp.AsyncGenerator[sqlas.AsyncEngine]:
 async def get_sql_session(
     async_engine: sqlas.AsyncEngine = Depends(get_sql_engine),
 ) -> tp.AsyncGenerator[sqlas.AsyncSession]:
+    async_session: sqlorm.Session = sqlorm.sessionmaker(
+        bind=async_engine, class_=sqlas.AsyncSession, expire_on_commit=False
+    )
+    async with async_session() as session:
+        yield session
+
+
+async def new_inmemory_anki_orm(
+    async_engine: sqlas.AsyncEngine = Depends(new_inmemory_sql_engine),
+) -> tp.AsyncGenerator[sqlas.AsyncEngine]:
+    async with async_engine.begin() as connection:
+        await connection.run_sync(create_anki_tables)
     async_session: sqlorm.Session = sqlorm.sessionmaker(
         bind=async_engine, class_=sqlas.AsyncSession, expire_on_commit=False
     )
@@ -71,6 +85,6 @@ async def lifespan(_: "FastAPI") -> tp.AsyncGenerator[None, None]:
         await s3.create_bucket(Bucket=BUCKET_NAME)
 
     get_sql_engine_context = asynccontextmanager(get_sql_engine)
-    async with get_sql_engine_context(SQL_URL) as engine, engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
+    async with get_sql_engine_context(SQL_URL) as engine, engine.begin() as connection:
+        await connection.run_sync(SQLModel.metadata.create_all)
         yield
