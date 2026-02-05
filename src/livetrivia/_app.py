@@ -11,7 +11,7 @@ import dash
 import dash.exceptions as de
 import dash_mantine_components as dmc
 from livetrivia.utils import assets_folder, getenvs, pages_folder
-from livetrivia._fe_app.components import token_store, user_store, interval, url
+from livetrivia.shared_components import token_store, user_store, interval, url
 
 
 dash._dash_renderer._set_react_version("18.2.0")

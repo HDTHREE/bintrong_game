@@ -4,7 +4,7 @@ import dash.exceptions as de
 import aiohttp
 import dash_mantine_components as dmc
 from livetrivia.utils import getenvs, getmod
-from livetrivia._fe_app.components import user_store, token_store
+from livetrivia.shared_components import user_store, token_store
 
 display_email = dmc.TextInput(
     label="Email",

@@ -107,10 +107,10 @@ def retry_with_backoff[P: dict[str, tp.Any], R: tp.Any](
     return decorator
 
 
-pages_folder: str = str(Path(os.path.abspath(__file__)).parent / "_fe_app" / "pages")
+pages_folder: str = str(Path(os.path.abspath(__file__)).parent / "pages")
 
 
-assets_folder: str = str(Path(os.path.abspath(__file__)).parent / "_fe_app" / "assets")
+assets_folder: str = str(Path(os.path.abspath(__file__)).parent / "assets")
 
 
 def getmod(dunder_name: str) -> str:

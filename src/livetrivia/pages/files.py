@@ -6,7 +6,7 @@ import dash_mantine_components as dmc
 import dash_ag_grid as dag
 import aiohttp
 from livetrivia.utils import getmod, getenvs
-from livetrivia._fe_app.components import token_store, user_store
+from livetrivia.shared_components import token_store, user_store
 
 
 app: dash.Dash = dash.get_app()
