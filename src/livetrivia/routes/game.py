@@ -1,19 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, HTTPException, status
 from sqlmodel import select
 from pydantic import BaseModel
 from datetime import datetime
 import uuid
-import typing_extensions as tp
 
-from livetrivia.db import get_sql_session
+from livetrivia.db import SqlSession
 from livetrivia.models.game import Game, GamePlayer
 from livetrivia.models.session import Session
 from livetrivia.models.status import Status
 from livetrivia.jwt_utils import verify_token
-
-
-if tp.TYPE_CHECKING:
-    import sqlalchemy.ext.asyncio as sqlas
 
 router: APIRouter = APIRouter(prefix="/games", tags=["games"])
 
@@ -46,7 +41,7 @@ class GamePlayerResponse(BaseModel):
 @router.post("/", response_model=GameResponse, status_code=status.HTTP_201_CREATED)
 async def create_game(
     access_token: str,
-    sql: "sqlas.AsyncSession" = Depends(get_sql_session),
+    sql: SqlSession,
 ) -> Game:
     user_id = verify_token(access_token, token_type="access")
     if not user_id:
@@ -81,7 +76,7 @@ async def create_game(
 async def join_game(
     game_code: str,
     access_token: str,
-    sql: "sqlas.AsyncSession" = Depends(get_sql_session),
+    sql: SqlSession,
 ) -> GamePlayer:
     user_id = verify_token(access_token, token_type="access")
     if not user_id:
@@ -139,7 +134,7 @@ async def join_game(
 async def start_game(
     game_id: uuid.UUID,
     access_token: str,
-    sql: "sqlas.AsyncSession" = Depends(get_sql_session),
+    sql: SqlSession,
 ) -> Game:
     user_id = verify_token(access_token, token_type="access")
     if not user_id:
@@ -198,7 +193,7 @@ async def start_game(
 async def end_game(
     game_id: uuid.UUID,
     access_token: str,
-    sql: "sqlas.AsyncSession" = Depends(get_sql_session),
+    sql: SqlSession,
 ) -> Game:
     user_id = verify_token(access_token, token_type="access")
     if not user_id:
@@ -260,7 +255,7 @@ async def increment_player_score(
     game_id: uuid.UUID,
     player_id: uuid.UUID,
     access_token: str,
-    sql: "sqlas.AsyncSession" = Depends(get_sql_session),
+    sql: SqlSession,
 ) -> GamePlayer:
     user_id = verify_token(access_token, token_type="access")
     if not user_id:

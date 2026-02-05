@@ -1,27 +1,22 @@
-from fastapi import APIRouter, Depends, status, UploadFile, File as FormFile
+from fastapi import APIRouter, status, UploadFile, File as FormFile
 import uuid
 
-from livetrivia.db import get_sql_session, get_s3_client, BUCKET_NAME
+from livetrivia.db import SqlSession, S3Client, BUCKET_NAME
 from livetrivia.models.files import File, FileDataResponse
-from livetrivia.routes.session import get_current_user
+from livetrivia.routes.session import CurrentUserId
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
-import typing_extensions as tp
 from sqlmodel import select
-
-if tp.TYPE_CHECKING:
-    import sqlalchemy.ext.asyncio as sqlas
-    import types_aiobotocore_s3 as aiob3t
 
 router: APIRouter = APIRouter(prefix="/files", tags=["files"])
 
 
 @router.post("/", response_model=FileDataResponse, status_code=status.HTTP_201_CREATED)
 async def upload_file(
-    user_id: uuid.UUID = Depends(get_current_user),
+    user_id: CurrentUserId,
+    sql: SqlSession,
+    s3: S3Client,
     file: UploadFile = FormFile(...),
-    sql: "sqlas.AsyncSession" = Depends(get_sql_session),
-    s3: "aiob3t.S3Client" = Depends(get_s3_client),
 ) -> File:
     id: uuid.UUID = uuid.uuid4()
     filename: str = file.filename or "unnamed"
@@ -50,9 +45,9 @@ async def upload_file(
 @router.get("/{file_id}")
 async def download_file(
     file_id: uuid.UUID,
-    user_id: uuid.UUID = Depends(get_current_user),
-    sql: "sqlas.AsyncSession" = Depends(get_sql_session),
-    s3: "aiob3t.S3Client" = Depends(get_s3_client),
+    user_id: CurrentUserId,
+    sql: SqlSession,
+    s3: S3Client,
 ) -> StreamingResponse:
     file = await sql.get(File, file_id)
     if not file:
@@ -89,9 +84,9 @@ async def download_file(
 @router.delete("/{file_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_file(
     file_id: uuid.UUID,
-    user_id: uuid.UUID = Depends(get_current_user),
-    sql: "sqlas.AsyncSession" = Depends(get_sql_session),
-    s3: "aiob3t.S3Client" = Depends(get_s3_client),
+    user_id: CurrentUserId,
+    sql: SqlSession,
+    s3: S3Client,
 ) -> None:
     file = await sql.get(File, file_id)
     if not file:
@@ -115,8 +110,8 @@ async def delete_file(
 )
 async def get_file_data(
     file_id: uuid.UUID,
-    user_id: uuid.UUID = Depends(get_current_user),
-    sql: "sqlas.AsyncSession" = Depends(get_sql_session),
+    user_id: CurrentUserId,
+    sql: SqlSession,
 ) -> FileDataResponse:
     file = await sql.get(File, file_id)
     if not file:
@@ -130,8 +125,8 @@ async def get_file_data(
     "/data/", response_model=list[FileDataResponse], status_code=status.HTTP_200_OK
 )
 async def get_all_files_data(
-    user_id: uuid.UUID = Depends(get_current_user),
-    sql: "sqlas.AsyncSession" = Depends(get_sql_session),
+    user_id: CurrentUserId,
+    sql: SqlSession,
 ) -> list[FileDataResponse]:
     stmt = select(File).where(File.user_id == user_id)
     result = await sql.execute(stmt)

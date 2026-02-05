@@ -2,34 +2,30 @@ import aiohttp
 import io
 import json
 import zipfile as zf
+import typing_extensions as tp
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict
 from sqlmodel import select
 from livetrivia.models.anki_deck import AnkiModel
 from livetrivia.models.files import FileDataResponse
-from livetrivia.routes.session import get_current_user
+from livetrivia.routes.session import CurrentUserId
 from livetrivia.db import (
-    get_sql_session,
-    get_s3_client,
+    SqlSession,
+    S3Client,
+    AnkiOrmSession,
     BUCKET_NAME,
-    new_inmemory_anki_orm,
 )
 import uuid
 from livetrivia.text_extraction import (
     YOUTUBE_VIDEO_PREFIX,
-    get_yt_api,
+    YTApi,
     get_docx_text,
     get_pdf_text,
 )
 from livetrivia.utils import getenvs
 from livetrivia.models.files import File
 
-import typing_extensions as tp
-
 if tp.TYPE_CHECKING:
-    import youtube_transcript_api as yt
-    import types_aiobotocore_s3 as aiob3t
-    import sqlalchemy.ext.asyncio as sqlas
     from pydantic import ConfigDict
     import sqlalchemy as sqla
 
@@ -151,10 +147,10 @@ async def get_gen_api(url: str = Depends(lambda: SGLANG_URL)):
 
 async def get_gen_text(
     input: YouTubeBody | FileBody,
-    user_id: uuid.UUID = Depends(get_current_user),
-    yt: "yt.YouTubeTranscriptApi" = Depends(get_yt_api),
-    s3: "aiob3t.S3Client" = Depends(get_s3_client),
-    sql: "sqlas.AsyncSession" = Depends(get_sql_session),
+    user_id: CurrentUserId,
+    yt: YTApi,
+    s3: S3Client,
+    sql: SqlSession,
 ) -> str:
     if input.file_id is not None:
         file = await sql.get(File, input.file_id)
@@ -229,15 +225,19 @@ async def get_gen_text(
     return text
 
 
+GenApi: tp.TypeAlias = tp.Annotated[aiohttp.ClientSession, Depends(get_gen_api)]
+GenText: tp.TypeAlias = tp.Annotated[str, Depends(get_gen_text)]
+
+
 @router.post("/", response_model=FileDataResponse, status_code=status.HTTP_201_CREATED)
 async def generate_anki(
     input: YouTubeBody | FileBody,
-    text: str = Depends(get_gen_text),
-    user_id: uuid.UUID = Depends(get_current_user),
-    sql: "sqlas.AsyncSession" = Depends(get_sql_session),
-    anki: "sqlas.AsyncSession" = Depends(new_inmemory_anki_orm),
-    s3: "aiob3t.S3Client" = Depends(get_s3_client),
-    gen: aiohttp.ClientSession = Depends(get_gen_api),
+    text: GenText,
+    user_id: CurrentUserId,
+    sql: SqlSession,
+    anki: AnkiOrmSession,
+    s3: S3Client,
+    gen: GenApi,
 ) -> File:
 
     # Select the appropriate prompt based on cloze parameter

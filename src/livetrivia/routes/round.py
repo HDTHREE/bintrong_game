@@ -1,19 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, HTTPException, status
 from sqlmodel import select
 from pydantic import BaseModel
 from datetime import datetime
 import uuid
 
-from livetrivia.db import get_sql_session
+from livetrivia.db import SqlSession
 from livetrivia.models.round import Round
 from livetrivia.models.game import Game
 from livetrivia.models.session import Session
 from livetrivia.models.status import Status
 from livetrivia.jwt_utils import verify_token
-import typing_extensions as tp
-
-if tp.TYPE_CHECKING:
-    import sqlalchemy.ext.asyncio as sqlas
 
 router: APIRouter = APIRouter(prefix="/rounds", tags=["rounds"])
 
@@ -36,7 +32,7 @@ class RoundResponse(BaseModel):
 async def create_round(
     game_id: uuid.UUID,
     access_token: str,
-    sql: "sqlas.AsyncSession" = Depends(get_sql_session),
+    sql: SqlSession,
 ) -> Round:
     user_id = verify_token(access_token, token_type="access")
     if not user_id:
@@ -92,7 +88,7 @@ async def create_round(
 async def start_round(
     round_id: uuid.UUID,
     access_token: str,
-    sql: "sqlas.AsyncSession" = Depends(get_sql_session),
+    sql: SqlSession,
 ) -> Round:
     user_id = verify_token(access_token, token_type="access")
     if not user_id:
@@ -158,7 +154,7 @@ async def start_round(
 async def end_round(
     round_id: uuid.UUID,
     access_token: str,
-    sql: "sqlas.AsyncSession" = Depends(get_sql_session),
+    sql: SqlSession,
 ) -> Round:
     user_id = verify_token(access_token, token_type="access")
     if not user_id:

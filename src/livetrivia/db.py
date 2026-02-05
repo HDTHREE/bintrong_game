@@ -88,3 +88,10 @@ async def lifespan(_: "FastAPI") -> tp.AsyncGenerator[None, None]:
     async with get_sql_engine_context(SQL_URL) as engine, engine.begin() as connection:
         await connection.run_sync(SQLModel.metadata.create_all)
         yield
+
+
+SqlSession: tp.TypeAlias = tp.Annotated[sqlas.AsyncSession, Depends(get_sql_session)]
+S3Client: tp.TypeAlias = tp.Annotated["aiob3t.S3Client", Depends(get_s3_client)]
+AnkiOrmSession: tp.TypeAlias = tp.Annotated[
+    sqlas.AsyncSession, Depends(new_inmemory_anki_orm)
+]
