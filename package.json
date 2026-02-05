@@ -8,7 +8,7 @@
     "lint": "xo --fix && uvx ruff check && uvx ruff format",
     "get-mistral": "mkdir -p models/mistral-7b && uvx --from huggingface_hub hf download mistralai/Mistral-7B-Instruct-v0.3 --local-dir ./models/mistral-7b",
     "dev:s3": "docker run --name localstack -p 4566:4566 -e SERVICES=s3 -e DEFAULT_REGION=us-east-1 -e DEBUG=1 localstack/localstack:latest",
-    "dev:sgl": "docker run -itd -p 30000:30000 --shm-size 32g --gpus all -v $(pwd)/models/mistral-7b:/local/mistral-7b:ro --ipc=host --privileged --name sglang lmsysorg/sglang:dev python -m sglang.launch_server --model /local/mistral-7b --context-length 32000 --tp 1 --quantization fp8 --kv-cache-dtype fp8_e5m2 --attention-backend triton --chunked-prefill-size 4096 --mem-fraction-static 0.8 --enable-torch-compile --host 0.0.0.0 --port 30000",
+    "dev:sgl": "docker run -itd -p 30000:30000 --shm-size 32g --gpus all -v $(pwd)/models/mistral-7b:/local/mistral-7b:ro --ipc=host --privileged --name sglang lmsysorg/sglang:dev python -m sglang.launch_server --model /local/mistral-7b --context-length 32000 --tp 1 --quantization fp8 --kv-cache-dtype fp8_e5m2 --attention-backend triton --chunked-prefill-size 4096 --mem-fraction-static 0.8 --enable-torch-compile --host 0.0.0.0 --allow-auto-truncate --port 30000",
     "dev:api": "./scripts/api.py",
     "dev:app": "./scripts/app.py"
   },

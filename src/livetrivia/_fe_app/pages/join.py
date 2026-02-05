@@ -8,7 +8,11 @@ game_code_input = dmc.PinInput(
     size="md",
     w="100%",
     length=6,
-    styles={"root": {"width": "100%"}, "pinInput": {"flex": 1}, "input": {"width": "100%"}},
+    styles={
+        "root": {"width": "100%"},
+        "pinInput": {"flex": 1},
+        "input": {"width": "100%"},
+    },
     type="alphanumeric",
     oneTimeCode=False,
 )
@@ -19,11 +23,13 @@ join_button = dmc.Button("Play!")
 
 join_card = dmc.Card(
     dmc.Fieldset(
-        dmc.Stack([
-            dmc.Title("Join", order=2),
-            game_code_input,
-            join_button,
-        ])
+        dmc.Stack(
+            [
+                dmc.Title("Join", order=2),
+                game_code_input,
+                join_button,
+            ]
+        )
     ),
     w="60vw",
     h="100%",
@@ -40,7 +46,7 @@ layout = dmc.AppShellMain(children=join_center)
 dash.clientside_callback(
     dash.ClientsideFunction("join", "updateState"),
     dash.Output(join_button, "disabled"),
-    dash.Input(game_code_input, "value")
+    dash.Input(game_code_input, "value"),
 )
 
 

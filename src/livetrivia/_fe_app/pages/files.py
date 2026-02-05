@@ -58,14 +58,21 @@ grid = dag.AgGrid(
 
 download = dash.dcc.Download()
 
-EXTS = ".akpg",".docx",".pdf",".txt" # TODO This should prob be not based on extension and based on media groups
+EXTS = (
+    ".akpg",
+    ".docx",
+    ".pdf",
+    ".txt",
+)  # TODO This should prob be not based on extension and based on media groups
 
 
 upload = dash.dcc.Upload(
-    children=dmc.Button("Upload File", leftSection=di.DashIconify(icon="ic:round-file-upload")),
+    children=dmc.Button(
+        "Upload File", leftSection=di.DashIconify(icon="ic:round-file-upload")
+    ),
     multiple=False,
     style={"marginBottom": "1rem"},
-    accept=",".join(EXTS)
+    accept=",".join(EXTS),
 )
 
 

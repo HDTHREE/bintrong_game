@@ -8,9 +8,19 @@ from sqlmodel import select
 from livetrivia.models.anki_deck import AnkiModel
 from livetrivia.models.files import FileDataResponse
 from livetrivia.routes.session import get_current_user
-from livetrivia.db import get_sql_session, get_s3_client, BUCKET_NAME, new_inmemory_anki_orm
+from livetrivia.db import (
+    get_sql_session,
+    get_s3_client,
+    BUCKET_NAME,
+    new_inmemory_anki_orm,
+)
 import uuid
-from livetrivia.text_extraction import YOUTUBE_VIDEO_PREFIX, get_yt_api, get_docx_text, get_pdf_text
+from livetrivia.text_extraction import (
+    YOUTUBE_VIDEO_PREFIX,
+    get_yt_api,
+    get_docx_text,
+    get_pdf_text,
+)
 from livetrivia.utils import getenvs
 from livetrivia.models.files import File
 
@@ -21,72 +31,97 @@ if tp.TYPE_CHECKING:
     import types_aiobotocore_s3 as aiob3t
     import sqlalchemy.ext.asyncio as sqlas
     from pydantic import ConfigDict
+    import sqlalchemy as sqla
+
 
 SGLANG_URL: str = getenvs()
 
 router: APIRouter = APIRouter(prefix="/generate", tags=["generate"])
 
 
+PROMPT = """You are an expert flashcard creator. Generate high-quality Anki flashcards from the provided text content.
 
-PROMPT = """
-You are a world-class Anki flashcard creator that helps students create flashcards that help them remember facts, concepts, and ideas from videos. You will be given a video or document or snippet.
-1. Identify key high-level concepts and ideas presented, including relevant equations. If the video is math or physics-heavy, focus on concepts. If the video isn't heavy on concepts, focus on facts.
-2. Then use your own knowledge of the concept, ideas, or facts to flesh out any additional details (eg, relevant facts, dates, and equations) to ensure the flashcards are self-contained.
-3. Make question-answer cards based on the video.
-4. Keep the questions and answers roughly in the same order as they appear in the video itself.
-5. If a video is provided, include timestamps in the question field in [ ] brackets at the end of the questions to the segment of the video that's relevant.
+## Instructions
+1. Extract key concepts, facts, definitions, and relationships from the text
+2. Create clear, concise question-answer pairs that test understanding
+3. Each card should focus on ONE concept or fact
+4. Questions should be specific and unambiguous
+5. Answers should be brief but complete
+6. Avoid trivial or overly obvious questions
+7. Create 10-25 cards depending on content density
 
-Output Format,
-- Do not have the first row being "Question" and "Answer".
-- The file will be imported into Anki. You should include each flashcard on a new line and use the pipe separator | to separate the question and answer. You should return a .txt file for me to download.
-- When writing math, wrap any math with the \( ... \) tags [eg, \( a^2+b^2=c^2 \) ] . By default this is inline math. For block math, use \[ ... \]. Decide when formatting each card.
-- When writing chemistry equations, use the format \( \ce{C6H12O6 + 6O2 -&gt; 6H2O + 6CO2} \) where the \ce is required for MathJax chemistry.
-- Put everything in a code block.
-- Do not use a new line for visual purposes in the answer or question as this is the indicator for a new flashcard. If you need to list smth, do it with <br>.
-- For bold text, use <b> </b>. For italic text, use <i> </i>.
+## Output Structure
+Generate a valid AnkiModel JSON with:
+- `col`: Collection metadata with a Basic note type model
+- `notes`: Array of notes where `flds` contains "Front\\x1fBack" (question and answer separated by \\x1f)
+- `cards`: Array of cards referencing the notes
 
-Be sure to be exhaustive. Cover as much as you can, do not stop when your output is getting too long. You can handle up to 200 cards, so please allow yourself to be as exhaustive as possible.
+## Col Configuration
+- Use model ID 1 for Basic cards
+- Use deck ID 1 for the default deck
+- Set `mid` in notes to match the model ID
+- Set `did` in cards to match the deck ID
+- Use current epoch milliseconds for timestamps and IDs (ensure uniqueness)
+- `guid` should be a unique 10-character alphanumeric string per note
+- `csum` should be a simple hash (use first 8 digits of note ID)
+- `sfld` should match the front field content
 
-MESSAGE TO PROCESS:
+## Example Note Format
+For a question "What is the capital of France?" with answer "Paris":
+- `flds`: "What is the capital of France?\\x1fParis"
+- `sfld`: "What is the capital of France?"
 
+## Text Content to Process:
 """
 
-CLOZE_PROMPT = """
-You are a world-class Anki **cloze-deletion** flashcard creator. I will give you a video, document, or snippet.
-1. Skim the material and identify the key concepts, facts, dates, definitions, and equations that a learner should recall long-term.
-• If the material is math/physics-heavy, prioritize conceptual understanding and derivations.
-• If it is fact-heavy, prioritize precise details and chronology.
-2. Expand briefly on each point with any extra context (examples, typical pitfalls, historical notes) so that every card is *self-contained*. A learner should not need the original source to answer.
-3. Convert each point into one (or at most two) **well-formed cloze deletions**:
-• Embed the hidden info inside `{{c1:: … }}`; use `c2`, `c3`, … if a second deletion is *really* necessary.
-• Keep **one atomic fact per cloze**. If you must hide multiple parts of an equation, consider separate cards.
-• If helpful, add a short *Hint* in the curly braces after `::` (e.g. `{{c1::Planck's constant::symbol h}}`).
-• When including math, wrap it with LaTeX: inline `$begin:math:text$ … $end:math:text$` or block `$begin:math:display$ … $end:math:display$` as appropriate.
-• For chemistry, use MathJax chem: `$begin:math:text$ \\ce{C6H12O6 + 6O2 -> 6H2O + 6CO2} $end:math:text$`.
-4. Maintain the **original order** of appearance from the source.
-5. If a video is provided, append the relevant timestamp(s) in square brackets **at the end** of the cloze line: `[12:34]` or `[12:34–13:02]`.
 
-**Output format**
-- Do not have the first row being "Cloze Text" and "Back Extra".
-- The file will be imported into Anki. You should include each flashcard on a new line and use the pipe separator | to separate the cloze text and extra information on the back. You should return a .txt file for me to download.
-- When writing math, wrap any math with the \( ... \) tags [eg, \( a^2+b^2=c^2 \) ] . By default this is inline math. For block math, use \[ ... \]. Decide when formatting each card.
-- When writing chemistry equations, use the format \( \ce{C6H12O6 + 6O2 -&gt; 6H2O + 6CO2} \) where the \ce is required for MathJax chemistry.
-- Put everything in a code block.
-- Do not use a new line for visual purposes in the answer or question as this is the indicator for a new flashcard. If you need to list smth, do it with <br>.
+CLOZE_PROMPT = """You are an expert flashcard creator. Generate high-quality Anki cloze deletion flashcards from the provided text content.
 
-Be sure to be exhaustive. Cover as much as you can, do not stop when your output is getting too long. You can handle up to 200 cards, so please allow yourself to be as exhaustive as possible.
+## Instructions
+1. Extract key concepts, facts, definitions, and relationships from the text
+2. Create cloze deletions that hide important terms, definitions, or concepts
+3. Use {{c1::hidden text}} syntax for cloze deletions
+4. Each note can have multiple cloze deletions (c1, c2, c3...) to create multiple cards
+5. Provide enough context around the cloze for meaningful recall
+6. Avoid hiding trivial words or creating ambiguous blanks
+7. Create 10-25 notes depending on content density
 
-MESSAGE TO PROCESS:
+## Output Structure
+Generate a valid AnkiModel JSON with:
+- `col`: Collection metadata with a Cloze note type model
+- `notes`: Array of notes where `flds` contains the cloze text (with optional extra field separated by \\x1f)
+- `cards`: Array of cards referencing the notes (one card per cloze number)
 
+## Col Configuration
+- Use model ID 2 for Cloze cards
+- Use deck ID 1 for the default deck
+- Set `mid` in notes to match the model ID
+- Set `did` in cards to match the deck ID
+- Use current epoch milliseconds for timestamps and IDs (ensure uniqueness)
+- `guid` should be a unique 10-character alphanumeric string per note
+- `csum` should be a simple hash (use first 8 digits of note ID)
+- `sfld` should be the text with cloze markers stripped
+- For notes with c1, c2, etc., create corresponding cards with `ord` 0, 1, etc.
+
+## Example Cloze Formats
+Single cloze: "The capital of France is {{c1::Paris}}"
+Multiple clozes: "{{c1::Python}} is a {{c2::programming language}} created by {{c3::Guido van Rossum}}"
+
+## Example Note Format
+For "The mitochondria is the {{c1::powerhouse}} of the {{c2::cell}}":
+- `flds`: "The mitochondria is the {{c1::powerhouse}} of the {{c2::cell}}\\x1f"
+- `sfld`: "The mitochondria is the powerhouse of the cell"
+- Create 2 cards: one with ord=0 (for c1), one with ord=1 (for c2)
+
+## Text Content to Process:
 """
-
 
 
 class YouTubeBody(BaseModel):
     """Request body for `/api/generate/`. Allows for generation of anki deck based on youtube URL."""
 
     model_config: "ConfigDict" = {"arbitrary_types_allowed": True}
-    """Model config needed to set this class to be mutuable within `get_gen_text`"""
+    """Model config needed to set this class to be mutuable within `get_gen_text`."""
 
     video: str
     """URL of video. Can include full-url or video id."""
@@ -100,6 +135,7 @@ class YouTubeBody(BaseModel):
 
 class FileBody(BaseModel):
     """Request body for `/api/generate/`. Allows for generation of anki deck based on existing file object."""
+
     file_id: uuid.UUID
     cloze: bool
 
@@ -109,8 +145,8 @@ class FileBody(BaseModel):
 
 
 async def get_gen_api(url: str = Depends(lambda: SGLANG_URL)):
-    yield aiohttp.ClientSession(base_url=url)
-
+    timeout = aiohttp.ClientTimeout(total=300)
+    yield aiohttp.ClientSession(base_url=url, timeout=timeout)
 
 
 async def get_gen_text(
@@ -127,15 +163,19 @@ async def get_gen_text(
         if file.user_id != user_id:
             raise HTTPException(status_code=403, detail="forbidden")
         *_, ext = file.prefix.split(".")
-        if ext == ".akpg" or ext not in {".docx",".pdf",".txt"}:
+        if ext == ".akpg" or ext not in {".docx", ".pdf", ".txt"}:
             raise HTTPException(status_code=422, detail="unprocessable body")
 
         resp = await s3.get_object(Bucket=BUCKET_NAME, Key=file.prefix)
         file_bytes = await resp["Body"].read()
 
         # Parse the file based on extension.
-        get_text: tp.Callable[[bytes], str] = {".txt": bytes.decode, ".pdf": get_pdf_text, ".docx": get_docx_text}.get(ext)
-        
+        get_text: tp.Callable[[bytes], str] = {
+            ".txt": bytes.decode,
+            ".pdf": get_pdf_text,
+            ".docx": get_docx_text,
+        }.get(ext)
+
         # TODO: cache this step somehow gl.
         text = get_text(file_bytes)
 
@@ -148,9 +188,9 @@ async def get_gen_text(
     script_prefix = f"{user_id}/scripts/{video_id}/transcript.json"
 
     # Check if transcript already exists in database.
-    existing_file = (await sql.execute(
-        select(File).where(File.prefix == script_prefix)
-    )).scalar_one_or_none()
+    existing_file = (
+        await sql.execute(select(File).where(File.prefix == script_prefix))
+    ).scalar_one_or_none()
 
     if existing_file is not None:
         # Transcript exists, fetch.
@@ -197,7 +237,7 @@ async def generate_anki(
     sql: "sqlas.AsyncSession" = Depends(get_sql_session),
     anki: "sqlas.AsyncSession" = Depends(new_inmemory_anki_orm),
     s3: "aiob3t.S3Client" = Depends(get_s3_client),
-    gen: aiohttp.ClientSession = Depends(get_gen_api)
+    gen: aiohttp.ClientSession = Depends(get_gen_api),
 ) -> File:
 
     # Select the appropriate prompt based on cloze parameter
@@ -210,7 +250,7 @@ async def generate_anki(
         "sampling_params": {
             "temperature": 0.7,
             "max_new_tokens": 26000,
-            "json_schema": json.dumps(AnkiModel.model_json_schema())
+            "json_schema": json.dumps(AnkiModel.model_json_schema()),
         },
     }
 
@@ -219,11 +259,11 @@ async def generate_anki(
             error_text = await response.text()
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"Generation API error: {error_text}"
+                detail=f"Generation API error: {error_text}",
             )
-        result = await response.json()
+        result: dict = await response.json()
 
-    generated_content = result.get("text")
+    generated_content = json.loads(result.get("text"))
     validated_model: AnkiModel = AnkiModel.model_validate(generated_content)
 
     file_id = uuid.uuid4()
@@ -234,11 +274,12 @@ async def generate_anki(
     await validated_model.add_to_sql(anki)
 
     buffer = io.BytesIO()
-    def synchronous_dump(sync_conn) -> None:
+
+    def synchronous_dump(sync_conn: sqla.Connection) -> None:
         nonlocal buffer
         with open(buffer, "w") as file:
             for line in sync_conn.iterdump():
-                file.write('%s\n' % line)
+                file.write("%s\n" % line)
         buffer.seek(0)
 
     async with await anki.connection() as connection:

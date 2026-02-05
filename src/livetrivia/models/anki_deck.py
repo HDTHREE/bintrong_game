@@ -1,13 +1,13 @@
 """SQLModel models for Anki collection.anki2 database."""
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from sqlmodel import SQLModel, Field
-import sqlalchemy.ext.asyncio.session as sqlas
 import typing_extensions as tp
 
 
 if tp.TYPE_CHECKING:
-    import sqlalchemy.connectors as sqlcon
+    import sqlalchemy as sqla
+    import sqlalchemy.ext.asyncio.session as sqlas
 
 
 class Col(SQLModel, table=True):
@@ -43,7 +43,9 @@ class Note(SQLModel, table=True):
 
     __tablename__ = "notes"
 
-    id: int = Field(default=None, primary_key=True, description="Note ID (epoch milliseconds)")
+    id: int = Field(
+        default=None, primary_key=True, description="Note ID (epoch milliseconds)"
+    )
     guid: str = Field(description="Globally unique ID for syncing")
     mid: int = Field(description="Model (note type) ID")
     mod: int = Field(description="Modification timestamp (seconds since epoch)")
@@ -65,19 +67,34 @@ class Card(SQLModel, table=True):
 
     __tablename__ = "cards"
 
-    id: int = Field(default=None, primary_key=True, description="Card ID (epoch milliseconds)")
+    id: int = Field(
+        default=None, primary_key=True, description="Card ID (epoch milliseconds)"
+    )
     nid: int = Field(description="Note ID this card belongs to")
     did: int = Field(description="Deck ID this card belongs to")
-    ord: int = Field(description="Template ordinal (which template generated this card)")
+    ord: int = Field(
+        description="Template ordinal (which template generated this card)"
+    )
     mod: int = Field(description="Modification timestamp (seconds since epoch)")
     usn: int = Field(description="Update sequence number for syncing")
-    type: int = Field(default=0, description="Card type: 0=new, 1=learning, 2=review, 3=relearning")
-    queue: int = Field(default=0, description="Queue: -3=sched buried, -2=user buried, -1=suspended, 0=new, 1=learning, 2=review, 3=day learning, 4=preview")
+    type: int = Field(
+        default=0, description="Card type: 0=new, 1=learning, 2=review, 3=relearning"
+    )
+    queue: int = Field(
+        default=0,
+        description="Queue: -3=sched buried, -2=user buried, -1=suspended, 0=new, 1=learning, 2=review, 3=day learning, 4=preview",
+    )
     due: int = Field(description="Due date/position (meaning depends on queue)")
-    ivl: int = Field(default=0, description="Current interval in days (negative = seconds)")
-    factor: int = Field(default=0, description="Ease factor (per mille, e.g., 2500 = 250%)")
+    ivl: int = Field(
+        default=0, description="Current interval in days (negative = seconds)"
+    )
+    factor: int = Field(
+        default=0, description="Ease factor (per mille, e.g., 2500 = 250%)"
+    )
     reps: int = Field(default=0, description="Number of reviews")
-    lapses: int = Field(default=0, description="Number of times card went from review to relearning")
+    lapses: int = Field(
+        default=0, description="Number of times card went from review to relearning"
+    )
     left: int = Field(default=0, description="Remaining learning/relearning steps")
     odue: int = Field(default=0, description="Original due date (for filtered decks)")
     odid: int = Field(default=0, description="Original deck ID (for filtered decks)")
@@ -93,7 +110,11 @@ class RevLog(SQLModel, table=True):
 
     __tablename__ = "revlog"
 
-    id: int = Field(default=None, primary_key=True, description="Review timestamp (epoch milliseconds)")
+    id: int = Field(
+        default=None,
+        primary_key=True,
+        description="Review timestamp (epoch milliseconds)",
+    )
     cid: int = Field(description="Card ID reviewed")
     usn: int = Field(description="Update sequence number for syncing")
     ease: int = Field(description="Button pressed: 1=again, 2=hard, 3=good, 4=easy")
@@ -101,7 +122,9 @@ class RevLog(SQLModel, table=True):
     lastIvl: int = Field(description="Previous interval before review")
     factor: int = Field(description="New ease factor after review")
     time: int = Field(description="Review duration in milliseconds")
-    type: int = Field(description="Review type: 0=learn, 1=review, 2=relearn, 3=cram/filtered, 4=manual")
+    type: int = Field(
+        description="Review type: 0=learn, 1=review, 2=relearn, 3=cram/filtered, 4=manual"
+    )
 
 
 class Grave(SQLModel, table=True):
@@ -128,7 +151,9 @@ class AnkiModel(BaseModel):
     graves: list[Grave] = Field(default_factory=list)
     """OMIT."""
 
-    async def add_to_sql(self, engine: "sqlas.AsyncSession", commit: bool = True) -> None:
+    async def add_to_sql(
+        self, engine: "sqlas.AsyncSession", commit: bool = True
+    ) -> None:
         engine.add(self.col)
         for note in self.notes:
             engine.add(note)
@@ -142,6 +167,16 @@ class AnkiModel(BaseModel):
             await engine.commit()
 
 
-async def create_anki_tables(engine: "sqlas.AsyncSession") -> None:
+def create_anki_tables(engine: "sqla.Connection") -> None:
     """Create all Anki collection tables in the database."""
-    SQLModel.metadata.create_all(engine, tables=[Col, Note, Card, RevLog, Grave], checkfirst=False)
+    SQLModel.metadata.create_all(
+        engine,
+        tables=[
+            Col.__table__,
+            Note.__table__,
+            Card.__table__,
+            RevLog.__table__,
+            Grave.__table__,
+        ],
+        checkfirst=False,
+    )

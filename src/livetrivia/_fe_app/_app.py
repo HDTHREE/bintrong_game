@@ -163,7 +163,7 @@ async def on_refresh(_: str | None, token: dict, email: str | None, __: int, id:
                 "api/sessions/refresh", params=params
             ) as session_response:
                 return await session_response.json(), dash.no_update
-        except:
+        finally:
             return None, None
 
 

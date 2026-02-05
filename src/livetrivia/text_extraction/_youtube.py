@@ -5,8 +5,10 @@ from livetrivia.utils import retry_with_backoff
 
 api: yt.YouTubeTranscriptApi = yt.YouTubeTranscriptApi()
 
+
 async def get_yt_api():
     yield api
+
 
 YOUTUBE_VIDEO_PREFIX: str = "https://www.youtube.com/watch?v="
 
