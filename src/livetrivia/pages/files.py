@@ -115,7 +115,7 @@ layout: dmc.AppShellMain = dmc.AppShellMain(
     dash.Input(user_store, "data"),
     dash.State(token_store, "data"),
 )
-async def update_files_grid(_: dict, token):
+async def update_files_grid(_: dict, token: dict):
     """Callback triggered when user data changes. Fetches all files for the user."""
     if not token or not token.get("access_token"):
         return []
@@ -127,8 +127,7 @@ async def update_files_grid(_: dict, token):
     ):
         if resp.status != 200:
             return []
-        data = await resp.json()
-        return data
+        return await resp.json()
 
 
 @app.callback(
