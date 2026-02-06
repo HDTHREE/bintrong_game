@@ -146,10 +146,8 @@ class AnkiModel(BaseModel):
     cards: list[Card]
 
     revlog: list[RevLog] = Field(default_factory=list)
-    """OMIT."""
 
     graves: list[Grave] = Field(default_factory=list)
-    """OMIT."""
 
     async def add_to_sql(
         self, engine: "sqlas.AsyncSession", commit: bool = True

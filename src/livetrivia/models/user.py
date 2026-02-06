@@ -13,6 +13,7 @@ class User(SQLModel, table=True):
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     """Primary key column: No other meaning besides an unique identifier."""
+
     email: EmailStr
     """Column: User email string input."""
     password: str
