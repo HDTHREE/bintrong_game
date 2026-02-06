@@ -14,11 +14,3 @@ def _get_pdf_text(
     start = max(0, start - 1)
     end = min(end, len(pages))
     return " ".join(map(lambda i: pages[i].extract_text(), range(start, end))).strip()
-
-
-if __name__ == "__main__":
-    import os
-
-    module_file_path = os.path.abspath(__file__)
-    file_path = Path(module_file_path).parent / "file.pdf"
-    print(_get_pdf_text(file_path))
