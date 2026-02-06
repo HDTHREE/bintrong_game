@@ -51,3 +51,6 @@ build-backend = "uv_build"
 
 [tool.uv.pip]
 all-extras = true
+
+[tool.ruff.lint.isort]
+known-first-party = ["livetrivia"]

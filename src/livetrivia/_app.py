@@ -24,65 +24,11 @@ app: dash.Dash = dash.Dash(
     prevent_initial_callbacks="initial_duplicate",
     external_scripts=["https://unpkg.com/dash.nprogress@latest/dist/dash.nprogress.js"],
 )
+"""Rerence from constructor call to global dash object."""
+
 
 BACKEND_URL: str = getenvs(logger=app.logger)
 """URL to backend service."""
-
-
-home_page = dash.page_registry["home"]
-
-
-join_page = dash.page_registry["join"]
-
-
-account_page = dash.page_registry["account"]
-
-
-login_page = dash.page_registry["login"]
-
-
-files_page = dash.page_registry["files"]
-
-
-home_link = dmc.NavLink(
-    label=dmc.Text(home_page["name"], w=170),
-    href=home_page["path"],
-    leftSection=di.DashIconify(icon="ic:round-home"),
-)
-
-
-join_link = dmc.NavLink(
-    label=dmc.Text(join_page["name"], w=170),
-    href=join_page["path"],
-    leftSection=di.DashIconify(icon="ic:round-connect-without-contact"),
-)
-
-
-login_link = dmc.NavLink(
-    label=dmc.Text(login_page["name"], w=170),
-    href=login_page["path"],
-    leftSection=di.DashIconify(icon="ic:round-login"),
-)
-
-
-files_link = dmc.NavLink(
-    label=dmc.Text(files_page["name"], w=170),
-    href=files_page["path"],
-    leftSection=di.DashIconify(icon="ic:round-drive-file-move"),
-)
-
-
-avatar = dmc.Avatar()
-
-
-avatar_link = dmc.NavLink(
-    label=dmc.Text(account_page["name"], w=170),
-    leftSection=avatar,
-    href=account_page["path"],
-)
-
-
-header_children = [home_link, join_link, files_link, login_link, avatar_link]
 
 
 app.layout = dmc.MantineProvider(
@@ -91,7 +37,41 @@ app.layout = dmc.MantineProvider(
         children=[
             dmc.AppShellHeader(
                 children=dmc.Flex(
-                    p=3, w="100%", h="100%", children=header_children, justify="right"
+                    p=3,
+                    w="100%",
+                    h="100%",
+                    children=[
+                        home_link := dmc.NavLink(
+                            label=dmc.Text(dash.page_registry["home"]["name"], w=170),
+                            href=dash.page_registry["home"]["path"],
+                            leftSection=di.DashIconify(icon="ic:round-home"),
+                        ),
+                        join_link := dmc.NavLink(
+                            label=dmc.Text(dash.page_registry["join"]["name"], w=170),
+                            href=dash.page_registry["join"]["path"],
+                            leftSection=di.DashIconify(
+                                icon="ic:round-connect-without-contact"
+                            ),
+                        ),
+                        login_link := dmc.NavLink(
+                            label=dmc.Text(dash.page_registry["login"]["name"], w=170),
+                            href=dash.page_registry["login"]["path"],
+                            leftSection=di.DashIconify(icon="ic:round-login"),
+                        ),
+                        files_link := dmc.NavLink(
+                            label=dmc.Text(dash.page_registry["files"]["name"], w=170),
+                            href=dash.page_registry["files"]["path"],
+                            leftSection=di.DashIconify(icon="ic:round-drive-file-move"),
+                        ),
+                        avatar_link := dmc.NavLink(
+                            label=dmc.Text(
+                                dash.page_registry["account"]["name"], w=170
+                            ),
+                            leftSection=(avatar := dmc.Avatar()),
+                            href=dash.page_registry["account"]["path"],
+                        ),
+                    ],
+                    justify="right",
                 )
             ),
             url,
@@ -103,11 +83,13 @@ app.layout = dmc.MantineProvider(
     )
 )
 
+
 app.clientside_callback(
     dash.ClientsideFunction("layout", "setInitials"),
     dash.Output(avatar, "children"),
     dash.Input(user_store, "data"),
 )
+"""Callback that displays the first two characters of the email."""
 
 
 app.clientside_callback(
@@ -116,6 +98,7 @@ app.clientside_callback(
     dash.Output(avatar_link, "style"),
     dash.Input(user_store, "data"),
 )
+"""Callback to toggle between displaying the login/account tab at the top."""
 
 
 @app.callback(
@@ -126,9 +109,10 @@ app.clientside_callback(
     prevent_initial_call=True,
 )
 def on_navigate(url: str | None, token: dict | None, user: str | None):
+    """Callback that triggers on navigation. Navigates users away from routes that require an account."""
     session: bool = token and user
-    real = {"/files", "/account", "/", "/login", "/join"}
-    protected = {"/files", "/account"}
+    real: set = {"/files", "/account", "/", "/login", "/join"}
+    protected: set = {"/files", "/account"}
 
     if not url or url not in real:
         return "/"
@@ -143,13 +127,14 @@ def on_navigate(url: str | None, token: dict | None, user: str | None):
 @app.callback(
     dash.Output(token_store, "data", allow_duplicate=True),
     dash.Output(user_store, "data", allow_duplicate=True),
-    dash.Input(url, "pathname"),
-    dash.Input(token_store, "data"),
     dash.State(user_store, "id"),
-    dash.Input(interval, "n_intervals"),
     dash.State(interval, "id"),
+    dash.Input(token_store, "data"),
+    dash.Input(url, "pathname"),
+    dash.Input(interval, "n_intervals"),
 )
-async def on_refresh(_: str | None, token: dict, email: str | None, __: int, id: str):
+async def on_refresh(email: str | None, id: str, token: dict, *_: str | int | None):
+    """Callback that triggers when a user refreshes or navigates to ensure a valid session."""
     if dash.ctx.triggered_id != id and token:
         raise de.PreventUpdate()
     async with aiohttp.ClientSession(BACKEND_URL) as session:
@@ -157,7 +142,7 @@ async def on_refresh(_: str | None, token: dict, email: str | None, __: int, id:
         if not email or not token:
             async with session.post("api/sessions/guest") as session_response:
                 return await session_response.json(), dash.no_update
-        # Otherwise, use refresh the session.
+        # Otherwise, refresh the session.
         try:
             params = {"refresh_token": token["refresh_token"]}
             async with session.post(
