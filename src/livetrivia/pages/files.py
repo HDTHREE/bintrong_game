@@ -11,7 +11,9 @@ from livetrivia.shared_components import token_store, user_store
 
 app: dash.Dash = dash.get_app()
 
-BACKEND_URL = getenvs()
+
+BACKEND_URL = getenvs(logger=app.logger)
+"""URL to backend service."""
 
 
 grid = dag.AgGrid(
@@ -76,20 +78,14 @@ upload = dash.dcc.Upload(
 )
 
 
-
 yt_button = dmc.Button(
     children="YouTube",
     color="red",
-    leftSection=di.DashIconify(icon="ic:outline-ondemand-video")
+    leftSection=di.DashIconify(icon="ic:outline-ondemand-video"),
 )
 
 
-
-modal = dmc.Modal(
-    modal_fieldset := dmc.Fieldset(
-    ),
-    keepMounted=True
-)
+modal = dmc.Modal(modal_fieldset := dmc.Fieldset(), keepMounted=True)
 
 
 files_center = dmc.Center(

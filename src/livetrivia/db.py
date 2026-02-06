@@ -7,13 +7,18 @@ import sqlalchemy.orm as sqlorm
 from livetrivia.utils import getenvs
 from livetrivia.models.anki_deck import create_anki_tables
 from fastapi import Depends
+import logging
 
 if tp.TYPE_CHECKING:
     from fastapi import Depends, FastAPI
     import types_aiobotocore_s3 as aiob3t
 
 
-SQL_URL, S3_URL, S3_REGION, BUCKET_NAME = getenvs()
+logger: logging.Logger = logging.Logger(__name__)
+"""Logger for db module to log failures to."""
+
+
+SQL_URL, S3_URL, S3_REGION, BUCKET_NAME = getenvs(logger=logger)
 """Enivronment variables for database and S3 configuration."""
 
 

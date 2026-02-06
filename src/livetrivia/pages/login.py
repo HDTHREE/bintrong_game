@@ -10,7 +10,8 @@ from livetrivia.shared_components import token_store, user_store
 app: dash.Dash = dash.get_app()
 
 
-BACKEND_URL: str = getenvs()
+BACKEND_URL: str = getenvs(logger=app.logger)
+"""URL to backend service."""
 
 
 email_input = dmc.TextInput(

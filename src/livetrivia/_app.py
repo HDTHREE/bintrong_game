@@ -25,7 +25,8 @@ app: dash.Dash = dash.Dash(
     external_scripts=["https://unpkg.com/dash.nprogress@latest/dist/dash.nprogress.js"],
 )
 
-BACKEND_URL: str = getenvs()
+BACKEND_URL: str = getenvs(logger=app.logger)
+"""URL to backend service."""
 
 
 home_page = dash.page_registry["home"]

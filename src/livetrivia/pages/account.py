@@ -42,7 +42,8 @@ dash.register_page(
 app: dash.Dash = dash.get_app()
 
 
-BACKEND_URL: str = getenvs()
+BACKEND_URL: str = getenvs(logger=app.logger)
+"""URL to backend service."""
 
 
 app.clientside_callback(

@@ -1,3 +1,4 @@
+import logging
 import aiohttp
 import io
 import json
@@ -30,7 +31,12 @@ if tp.TYPE_CHECKING:
     import sqlalchemy as sqla
 
 
-SGLANG_URL: str = getenvs()
+logger: logging.Logger = logging.Logger(__name__)
+
+
+SGLANG_URL: str = getenvs(logger=logger)
+"""URL to SGLang service."""
+
 
 router: APIRouter = APIRouter(prefix="/generate", tags=["generate"])
 

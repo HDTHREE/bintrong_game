@@ -2,17 +2,24 @@ import jwt
 from datetime import datetime, timedelta, timezone
 import uuid
 import typing_extensions as tp
+import logging
 
 from livetrivia.utils import getenvs
 
-
-SECRET_KEY, ALGORITHM = getenvs()
-
-
-ACCESS_TOKEN_EXPIRE_MINUTES: int = getenvs()
+logger: logging.Logger = logging.Logger(__name__)
+"""Logger for jwt module to log failures to."""
 
 
-REFRESH_TOKEN_EXPIRE_DAYS: int = getenvs()
+SECRET_KEY, ALGORITHM = getenvs(logger=logger)
+"""Secret and algorithm to use for input to `jwt.encode`.header|.algorithm respectively."""
+
+
+ACCESS_TOKEN_EXPIRE_MINUTES: int = getenvs(logger=logger)
+"""Number of minutes to issue a session before it expires (access expire)."""
+
+
+REFRESH_TOKEN_EXPIRE_DAYS: int = getenvs(logger=logger)
+"""Number of days to issue a session before it expires (refresh expire)."""
 
 
 def create_access_token(
