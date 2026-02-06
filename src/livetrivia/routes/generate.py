@@ -32,6 +32,7 @@ if tp.TYPE_CHECKING:
 
 
 logger: logging.Logger = logging.Logger(__name__)
+"""Logger for generate module to log failures to."""
 
 
 SGLANG_URL: str = getenvs(logger=logger)
