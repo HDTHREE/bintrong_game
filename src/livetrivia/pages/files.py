@@ -71,8 +71,24 @@ upload = dash.dcc.Upload(
         "Upload File", leftSection=di.DashIconify(icon="ic:round-file-upload")
     ),
     multiple=False,
-    style={"marginBottom": "1rem"},
+    style={"marginBottom": "1rem", "width": "fit-content"},
     accept=",".join(EXTS),
+)
+
+
+
+yt_button = dmc.Button(
+    children="YouTube",
+    color="red",
+    leftSection=di.DashIconify(icon="ic:outline-ondemand-video")
+)
+
+
+
+modal = dmc.Modal(
+    modal_fieldset := dmc.Fieldset(
+    ),
+    keepMounted=True
 )
 
 
@@ -82,8 +98,10 @@ files_center = dmc.Center(
             [
                 dmc.Title("Your Files", order=2),
                 upload,
+                yt_button,
                 grid,
                 download,
+                modal,
             ]
         ),
         w="100vw",

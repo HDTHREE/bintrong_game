@@ -1,5 +1,16 @@
 10x Dev's
 
+# Running the Application
+The application is hosted via
+[`helm`](https://helm.sh/docs/intro/quickstart#install-kubernetes-or-have-access-to-a-cluster)
+which requires a configured kubernetes cluster. I would recommend
+[`kind`](https://kind.sigs.k8s.io/docs/user/quick-start/) +
+[Docker Desktop](https://docs.docker.com/desktop/)
+(with [WSL2](https://docs.docker.com/desktop/features/wsl/#enabling-docker-support-in-wsl-2-distributions.)).
+
+## Testing (source)
+For see [source.md](source.md) for instructions for running from source and setting up a developer environment.
+
 # Team Members
 * Hayden Dennis - BS Computer Science (dennishc@mail.uc.edu)
 
