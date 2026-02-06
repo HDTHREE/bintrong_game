@@ -10,55 +10,12 @@ from livetrivia.shared_components import token_store, user_store
 
 
 app: dash.Dash = dash.get_app()
+"""Reference to global dash object."""
 
 
-BACKEND_URL = getenvs(logger=app.logger)
+BACKEND_URL: str = getenvs(logger=app.logger)
 """URL to backend service."""
 
-
-grid = dag.AgGrid(
-    columnDefs=[
-        {
-            "headerName": "File Name",
-            "field": "prefix",
-            "flex": 3,
-            "valueGetter": {"function": "nameGetter(params)"},
-        },
-        {"headerName": "File ID", "field": "id", "flex": 3},
-        {
-            "headerName": "Delete",
-            "cellRenderer": "dmcButton",
-            "cellRendererParams": {
-                "rightIcon": "ic:round-delete",
-                "value": "Delete",
-                "color": "red",
-            },
-            "field": "user_id",
-            "colId": "Delete",
-            "flex": 1,
-        },
-        {
-            "headerName": "Download",
-            "cellRenderer": "dmcButton",
-            "cellRendererParams": {
-                "rightIcon": "ic:round-file-download",
-                "value": "Download",
-            },
-            "field": "user_id",
-            "colId": "Download",
-            "flex": 1,
-        },
-    ],
-    className="ag-theme-alpine",
-    dashGridOptions={
-        "pagination": True,
-        "paginationPageSize": 10,
-        "paginationPageSizeOptions": [10, 25, 50, 100],
-        "paginationMaxPageSize": 100,
-    },
-)
-
-download = dash.dcc.Download()
 
 EXTS = (
     ".akpg",
@@ -66,50 +23,83 @@ EXTS = (
     ".pdf",
     ".txt",
 )  # TODO This should prob be not based on extension and based on media groups
+"""Accepted file extensions for upload."""
 
 
-upload = dash.dcc.Upload(
-    children=dmc.Button(
-        "Upload File", leftSection=di.DashIconify(icon="ic:round-file-upload")
-    ),
-    multiple=False,
-    style={"marginBottom": "1rem", "width": "fit-content"},
-    accept=",".join(EXTS),
-)
-
-
-yt_button = dmc.Button(
-    children="YouTube",
-    color="red",
-    leftSection=di.DashIconify(icon="ic:outline-ondemand-video"),
-)
-
-
-modal = dmc.Modal(modal_fieldset := dmc.Fieldset(), keepMounted=True)
-
-
-files_center = dmc.Center(
-    dmc.Card(
-        dmc.Stack(
-            [
-                dmc.Title("Your Files", order=2),
-                upload,
-                yt_button,
-                grid,
-                download,
-                modal,
-            ]
+layout: dmc.AppShellMain = dmc.AppShellMain(
+    children=dmc.Center(
+        children=dmc.Card(
+            children=dmc.Stack(
+                children=[
+                    dmc.Title("Your Files", order=2),
+                    dmc.Button(
+                        upload := dash.dcc.Upload(
+                            children=dmc.Text(children="Upload File"),
+                            multiple=False,
+                            style={"marginBottom": "1rem", "width": "fit-content"},
+                            accept=",".join(EXTS),
+                        ),
+                        leftSection=di.DashIconify(icon="ic:round-file-upload"),
+                    ),
+                    yt_button := dmc.Button(
+                        children="YouTube",
+                        color="red",
+                        leftSection=di.DashIconify(icon="ic:outline-ondemand-video"),
+                    ),
+                    grid := dag.AgGrid(
+                        columnDefs=[
+                            {
+                                "headerName": "File Name",
+                                "field": "prefix",
+                                "flex": 3,
+                                "valueGetter": {"function": "nameGetter(params)"},
+                            },
+                            {"headerName": "File ID", "field": "id", "flex": 3},
+                            {
+                                "headerName": "Delete",
+                                "cellRenderer": "dmcButton",
+                                "cellRendererParams": {
+                                    "rightIcon": "ic:round-delete",
+                                    "value": "Delete",
+                                    "color": "red",
+                                },
+                                "field": "user_id",
+                                "colId": "Delete",
+                                "flex": 1,
+                            },
+                            {
+                                "headerName": "Download",
+                                "cellRenderer": "dmcButton",
+                                "cellRendererParams": {
+                                    "rightIcon": "ic:round-file-download",
+                                    "value": "Download",
+                                },
+                                "field": "user_id",
+                                "colId": "Download",
+                                "flex": 1,
+                            },
+                        ],
+                        className="ag-theme-alpine",
+                        dashGridOptions={
+                            "pagination": True,
+                            "paginationPageSize": 10,
+                            "paginationPageSizeOptions": [10, 25, 50, 100],
+                            "paginationMaxPageSize": 100,
+                        },
+                    ),
+                    download := dash.dcc.Download(),
+                    modal := dmc.Modal(
+                        modal_fieldset := dmc.Fieldset(), keepMounted=True
+                    ),
+                ]
+            ),
+            w="100vw",
+            h="100vh",
+            style={"overflow": "hidden", "boxSizing": "border-box"},
         ),
-        w="100vw",
         h="100vh",
         style={"overflow": "hidden", "boxSizing": "border-box"},
     ),
-    h="100vh",
-    style={"overflow": "hidden", "boxSizing": "border-box"},
-)
-
-layout = dmc.AppShellMain(
-    children=files_center,
     style={
         "width": "100vw",
         "height": "100vh",
@@ -117,12 +107,7 @@ layout = dmc.AppShellMain(
         "boxSizing": "border-box",
     },
 )
-
-dash.register_page(
-    getmod(__name__),
-    path="/files",
-    layout=layout,
-)
+"""Layout for files page. Embedded into `livetrivia._app` at `dash.page_container`."""
 
 
 @app.callback(
@@ -131,6 +116,7 @@ dash.register_page(
     dash.State(token_store, "data"),
 )
 async def update_files_grid(_: dict, token):
+    """Callback triggered when user data changes. Fetches all files for the user."""
     if not token or not token.get("access_token"):
         return []
     access_token = token["access_token"]
@@ -155,17 +141,21 @@ async def update_files_grid(_: dict, token):
     prevent_initial_call=True,
 )
 async def handle_file_action(
-    render_data: dict, row_data: list[dict], user: str, token: dict
+    render_data: dict, row_data: list[dict], _: str, token: dict
 ):
+    """Callback triggered when user clicks a grid action button (delete/download)."""
     if not render_data or not token or not token.get("access_token"):
         raise de.PreventUpdate()
-    row_id: int = int(render_data.get("rowId"))
-    action: str = str(render_data.get("colId"))
+    try:
+        row_id: int = int(render_data.get["rowId"])
+        action: str = str(render_data.get["colId"])
 
-    access_token: str = str(token["access_token"])
+        access_token: str = str(token["access_token"])
 
-    row = row_data[row_id]
-    file_id = row["id"]
+        row: dict = row_data[row_id]
+        file_id: str = str(row.get["id"])
+    except KeyError as e:
+        raise de.PreventUpdate() from e
 
     params: dict = {"access_token": access_token}
     download_data: dash.NoUpdate | dict = dash.no_update
@@ -178,9 +168,9 @@ async def handle_file_action(
             async with session.get(f"api/files/{file_id}", params=params) as resp:
                 if resp.status != 200:
                     raise de.PreventUpdate()
-                content = await resp.read()
-                filename = None
-                cd = resp.headers.get("Content-Disposition")
+                content: bytes = await resp.read()
+                filename: str | None = None
+                cd: str | None = resp.headers.get("Content-Disposition")
                 if cd and "filename=" in cd:
                     filename = cd.split("filename=")[-1].strip('"')
                 else:
@@ -188,6 +178,8 @@ async def handle_file_action(
                     if "/" in filename:
                         filename = filename.split("/")[-1]
                 download_data = dash.dcc.send_bytes(content, filename=filename)
+        else:
+            raise de.PreventUpdate()
         async with session.get("api/files/data/", params=params) as resp:
             if resp.status != 200:
                 raise de.PreventUpdate()
@@ -202,25 +194,34 @@ async def handle_file_action(
     dash.State(token_store, "data"),
     prevent_initial_call=True,
 )
-async def upload_file(contents, filename, token: dict):
+async def upload_file(contents: str, filename: str, token: dict):
+    """Callback triggered when user uploads a file. Sends file to backend API."""
     if not contents or not filename or not token or not token.get("access_token"):
         raise de.PreventUpdate()
-    header, b64data = contents.split(",", 1)
-    file_bytes = base64.b64decode(b64data)
-    access_token = token["access_token"]
+    _, b64data = contents.split(",", 1)
+    file_bytes: bytes = base64.b64decode(b64data)
+    access_token: str = token["access_token"]
     params = {"access_token": access_token}
     async with aiohttp.ClientSession(BACKEND_URL) as session:
-        form = aiohttp.FormData()
-        form.add_field(
-            "file",
-            file_bytes,
-            filename=filename,
-            content_type="application/octet-stream",
+        data: aiohttp.FormData = aiohttp.FormData(
+            fields={
+                "name": "file",
+                "value": file_bytes,
+                "filename": filename,
+                "content_type": "application/octet-stream",
+            }
         )
-        async with session.post("api/files/", data=form, params=params) as resp:
+        async with session.post("api/files/", data=data, params=params) as resp:
             if resp.status != 201:
                 raise de.PreventUpdate()
         async with session.get("api/files/data/", params=params) as resp:
             if resp.status != 200:
                 raise de.PreventUpdate()
             return await resp.json()
+
+
+dash.register_page(
+    getmod(__name__),
+    path="/files",
+    layout=layout,
+)
