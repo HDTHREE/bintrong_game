@@ -1,5 +1,4 @@
 """SQLModel models for Anki collection.anki2 database. Table definitions adapted from: https://github.com/kerrickstaley/genanki/blob/main/genanki/apkg_schema.py."""
-
 from pydantic import BaseModel
 from sqlalchemy import Index
 from sqlmodel import SQLModel, Field
@@ -9,6 +8,28 @@ import typing_extensions as tp
 if tp.TYPE_CHECKING:
     import sqlalchemy as sqla
     import sqlalchemy.ext.asyncio.session as sqlas
+
+
+def creatable[T: type[BaseModel]](
+    defaults: dict,
+    *args: list[T],
+) -> T | tp.Callable[[T], T]:
+    """Decorator that adds a `create` classmethod with defaults partially applied."""
+    def decorator(cls: T) -> T:
+        @classmethod
+        def create(cls_: type, *a, **kwargs):
+            """Create an instance with default values pre-applied."""
+            merged = {**defaults, **kwargs}
+            return cls_(*a, **merged)
+        
+        cls.create = create
+        return cls
+
+    if args:
+        *_, c = args
+        return decorator(c)
+
+    return decorator
 
 
 class Col(SQLModel, table=True):
