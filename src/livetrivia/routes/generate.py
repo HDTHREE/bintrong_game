@@ -7,7 +7,7 @@ import typing_extensions as tp
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict
 from sqlmodel import select
-from livetrivia.models.anki_deck import AnkiModel
+from livetrivia.models.anki_deck import AnkiFile
 from livetrivia.models.files import FileDataResponse
 from livetrivia.routes.session import CurrentUserId
 from livetrivia.db import (
@@ -257,7 +257,7 @@ async def generate_anki(
         "sampling_params": {
             "temperature": 0.7,
             "max_new_tokens": 26000,
-            "json_schema": json.dumps(AnkiModel.model_json_schema()),
+            "json_schema": json.dumps(AnkiFile.model_json_schema()),
         },
     }
 
@@ -271,7 +271,7 @@ async def generate_anki(
         result: dict = await response.json()
 
     generated_content = json.loads(result.get("text"))
-    validated_model: AnkiModel = AnkiModel.model_validate(generated_content)
+    validated_model: AnkiFile = AnkiFile.model_validate(generated_content)
 
     file_id = uuid.uuid4()
     card_type = "cloze" if input.cloze else "basic"

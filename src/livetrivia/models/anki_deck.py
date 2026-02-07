@@ -1,6 +1,7 @@
-"""SQLModel models for Anki collection.anki2 database."""
+"""SQLModel models for Anki collection.anki2 database. Table definitions adapted from: https://github.com/kerrickstaley/genanki/blob/main/genanki/apkg_schema.py."""
 
 from pydantic import BaseModel
+from sqlalchemy import Index
 from sqlmodel import SQLModel, Field
 import typing_extensions as tp
 
@@ -42,6 +43,10 @@ class Note(SQLModel, table=True):
     """
 
     __tablename__ = "notes"
+    __table_args__ = (
+        Index('ix_notes_usn', 'usn'),
+        Index('ix_notes_csum', 'csum'),
+    )
 
     id: int = Field(
         default=None, primary_key=True, description="Note ID (epoch milliseconds)"
@@ -66,6 +71,11 @@ class Card(SQLModel, table=True):
     """
 
     __tablename__ = "cards"
+    __table_args__ = (
+        Index('ix_cards_usn', 'usn'),
+        Index('ix_cards_nid', 'nid'),
+        Index('ix_cards_sched', 'did', 'queue', 'due'),
+    )
 
     id: int = Field(
         default=None, primary_key=True, description="Card ID (epoch milliseconds)"
@@ -109,6 +119,10 @@ class RevLog(SQLModel, table=True):
     """
 
     __tablename__ = "revlog"
+    __table_args__ = (
+        Index('ix_revlog_usn', 'usn'),
+        Index('ix_revlog_cid', 'cid'),
+    )
 
     id: int = Field(
         default=None,
@@ -140,7 +154,7 @@ class Grave(SQLModel, table=True):
     type: int = Field(primary_key=True, description="Type: 0=card, 1=note, 2=deck")
 
 
-class AnkiModel(BaseModel):
+class AnkiFile(BaseModel):
     col: Col
     notes: list[Note]
     cards: list[Card]
