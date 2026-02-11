@@ -6,7 +6,39 @@ git clone https://github.com/HDTHREE/bintrong_game.git
 cd bintrong_game
 ```
 
-## Creating an environment 
+## Helm
+The downright easiest way to host the application is to use
+[`helm`](https://helm.sh/docs/intro/quickstart#install-kubernetes-or-have-access-to-a-cluster)
+managing a kubernetes cluster. Helm allows developers to define charts of 'charts' to create a
+dependency tree of deployed services.
+
+If you haven't used helm but do know kubernetes, helm is essentially a wrapper for
+[`kubectl`](https://kubernetes.io/docs/reference/kubectl/).
+
+### Kubernetes
+Helm requires a kluster to 'install' to in order to deploy an application. If you already have one,
+that is great & you don't need to do any of this.
+
+
+#### Windows (WSL2)
+If you are using windows the following can be used to setup docker desktop (with kind or kubeadm) with an compatible cluster running locally. This is the best way to run the application on Windows. The following instructions should be able to be adjusted to be used on any linux distrubtion with docker desktop. Any helm compatible platform will work.
+* In an admin powershell run:
+  * `wsl --install`
+  * `wsl --set-default-version 2`
+* Download and install
+[docker desktop](https://www.docker.com/products/docker-desktop/)
+or get it with `winget install -e --id Docker.DockerDesktop`.
+  * Ensure to enable "Use WSL 2 instead of Hyper-V". *Settings > General > Use the WSL 2 based engine*
+  * Enable WSL2 integration (only necessary if repo is cloned to linux filesystem). *Settings > Resources > WSL2 Integration > Configure which WSL 2 distros you want to access Docker from*
+  * Enable kubernetes. *Settings > Kubernetes > Enable Kubernetes*
+
+
+### Using Helm
+Once helm is configured releases can be managed using the CLI tool. To simply deploy the application run:
+`helm install lt-release ./lt`. To down the chart run: `helm uninstall lt-release`.
+
+
+## Development
 The bearcat game services relies on python and node.
 * [`uv`](https://docs.astral.sh/uv/getting-started/installation/) is used to manage python dependencies and version.
 * [`nvm`](https://github.com/nvm-sh/nvm?tab=readme-ov-file#installing-and-updating) is used to manage node version (i.e. [`npm`](https://github.com/nvm-sh/nvm?tab=readme-ov-file#nvmrc) from [.nvmrc](./.nvmrc)).
