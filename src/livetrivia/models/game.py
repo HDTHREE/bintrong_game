@@ -41,6 +41,7 @@ class Game(SQLModel, table=True):
 
 class GamePlayer(SQLModel, table=True):
     """Table for GamePlayers."""
+
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     """Primary key column: No other meaning besides an unique identifier."""
 

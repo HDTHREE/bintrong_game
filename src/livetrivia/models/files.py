@@ -25,6 +25,7 @@ class File(SQLModel, table=True):
 
 class FileDataResponse(BaseModel):
     """Response model for returning information about an uploaded file."""
+
     id: uuid.UUID
     """Primary key column: No other meaning besides an unique identifier."""
     prefix: str

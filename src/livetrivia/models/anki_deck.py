@@ -1,4 +1,5 @@
 """SQLModel models for Anki collection.anki2 database. Table definitions adapted from: https://github.com/kerrickstaley/genanki/blob/main/genanki/apkg_schema.py."""
+
 from pydantic import BaseModel
 from pydantic.json_schema import GenerateJsonSchema, JsonSchemaMode, JsonSchemaValue
 from sqlalchemy import Index
@@ -17,6 +18,7 @@ def creatable[T: type[BaseModel]](
     *args: list[T],
 ) -> T | tp.Callable[[T], T]:
     """Decorator that adds a `create` classmethod with defaults partially applied."""
+
     def decorator(cls: T) -> T:
         @classmethod
         def create(cls_: type, *a, **kwargs):
@@ -24,23 +26,25 @@ def creatable[T: type[BaseModel]](
             nonlocal defaults
             merged = {**defaults, **kwargs}
             return cls_(*a, **merged)
-        
+
         setattr(cls, "create", create)
 
         class GenerateCreateJsonSchema(GenerateJsonSchema):
             """Custom schema generator class to ignore provided (default) fields."""
 
-            def generate(self: tp.Self, schema: "CoreSchema", mode: JsonSchemaMode='validation') -> JsonSchemaValue:
+            def generate(
+                self: tp.Self, schema: "CoreSchema", mode: JsonSchemaMode = "validation"
+            ) -> JsonSchemaValue:
                 nonlocal defaults
                 json_schema: JsonSchemaValue = super().generate(schema, mode)
                 # Remove properties that have defaults
-                if 'properties' in json_schema:
+                if "properties" in json_schema:
                     for key in defaults:
-                        json_schema['properties'].pop(key, None)
+                        json_schema["properties"].pop(key, None)
                 # Update required to not include defaulted fields
-                if 'required' in json_schema:
-                    json_schema['required'] = [
-                        r for r in json_schema['required'] if r not in defaults
+                if "required" in json_schema:
+                    json_schema["required"] = [
+                        r for r in json_schema["required"] if r not in defaults
                     ]
                 return json_schema
 
@@ -51,7 +55,7 @@ def creatable[T: type[BaseModel]](
             """Custom create json schema json that generates a schema for the required form information to create an entry."""
             nonlocal GenerateCreateJsonSchema
             return cls.model_json_schema(schema_generator=GenerateCreateJsonSchema)
-        
+
         setattr(cls, "create_json_schema", create_json_schema)
 
         return cls
@@ -63,17 +67,19 @@ def creatable[T: type[BaseModel]](
     return decorator
 
 
-@creatable({
-    "ver": 11,
-    "dty": 0,
-    "usn": -1,
-    "ls": 0,
-    "conf": "{}",
-    "models": "{}",
-    "decks": "{}",
-    "dconf": "{}",
-    "tags": "{}",
-})
+@creatable(
+    {
+        "ver": 11,
+        "dty": 0,
+        "usn": -1,
+        "ls": 0,
+        "conf": "{}",
+        "models": "{}",
+        "decks": "{}",
+        "dconf": "{}",
+        "tags": "{}",
+    }
+)
 class Col(SQLModel, table=True):
     """Collection metadata table.
 
@@ -98,12 +104,14 @@ class Col(SQLModel, table=True):
     tags: str = Field(description="JSON object of tags cache")
 
 
-@creatable({
-    "usn": -1,
-    "tags": "",
-    "flags": 0,
-    "data": "",
-})
+@creatable(
+    {
+        "usn": -1,
+        "tags": "",
+        "flags": 0,
+        "data": "",
+    }
+)
 class Note(SQLModel, table=True):
     """Notes table.
 
@@ -113,8 +121,8 @@ class Note(SQLModel, table=True):
 
     __tablename__ = "notes"
     __table_args__ = (
-        Index('ix_notes_usn', 'usn'),
-        Index('ix_notes_csum', 'csum'),
+        Index("ix_notes_usn", "usn"),
+        Index("ix_notes_csum", "csum"),
     )
 
     id: int = Field(
@@ -132,20 +140,22 @@ class Note(SQLModel, table=True):
     data: str = Field(default="", description="Unused data field")
 
 
-@creatable({
-    "usn": -1,
-    "type": 0,
-    "queue": 0,
-    "ivl": 0,
-    "factor": 0,
-    "reps": 0,
-    "lapses": 0,
-    "left": 0,
-    "odue": 0,
-    "odid": 0,
-    "flags": 0,
-    "data": "",
-})
+@creatable(
+    {
+        "usn": -1,
+        "type": 0,
+        "queue": 0,
+        "ivl": 0,
+        "factor": 0,
+        "reps": 0,
+        "lapses": 0,
+        "left": 0,
+        "odue": 0,
+        "odid": 0,
+        "flags": 0,
+        "data": "",
+    }
+)
 class Card(SQLModel, table=True):
     """Cards table.
 
@@ -155,9 +165,9 @@ class Card(SQLModel, table=True):
 
     __tablename__ = "cards"
     __table_args__ = (
-        Index('ix_cards_usn', 'usn'),
-        Index('ix_cards_nid', 'nid'),
-        Index('ix_cards_sched', 'did', 'queue', 'due'),
+        Index("ix_cards_usn", "usn"),
+        Index("ix_cards_nid", "nid"),
+        Index("ix_cards_sched", "did", "queue", "due"),
     )
 
     id: int = Field(
@@ -195,9 +205,11 @@ class Card(SQLModel, table=True):
     data: str = Field(default="", description="Unused data field")
 
 
-@creatable({
-    "usn": -1,
-})
+@creatable(
+    {
+        "usn": -1,
+    }
+)
 class RevLog(SQLModel, table=True):
     """Review log table.
 
@@ -206,8 +218,8 @@ class RevLog(SQLModel, table=True):
 
     __tablename__ = "revlog"
     __table_args__ = (
-        Index('ix_revlog_usn', 'usn'),
-        Index('ix_revlog_cid', 'cid'),
+        Index("ix_revlog_usn", "usn"),
+        Index("ix_revlog_cid", "cid"),
     )
 
     id: int = Field(
