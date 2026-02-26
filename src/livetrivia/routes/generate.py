@@ -25,6 +25,8 @@ from livetrivia.text_extraction import (
 )
 from livetrivia.utils import getenvs
 from livetrivia.models.files import File
+import time
+import asyncio
 
 if tp.TYPE_CHECKING:
     from pydantic import ConfigDict
@@ -40,6 +42,9 @@ SGLANG_URL: str = getenvs(logger=logger)
 
 
 router: APIRouter = APIRouter(prefix="/generate", tags=["generate"])
+
+
+CHUNK_SIZE = 20000
 
 
 PROMPT = """"""
@@ -166,21 +171,8 @@ GenApi: tp.TypeAlias = tp.Annotated[aiohttp.ClientSession, Depends(get_gen_api)]
 GenText: tp.TypeAlias = tp.Annotated[str, Depends(get_gen_text)]
 
 
-@router.post("/", response_model=FileDataResponse, status_code=status.HTTP_201_CREATED)
-async def generate_anki(
-    input: YouTubeBody | FileBody,
-    text: GenText,
-    user_id: CurrentUserId,
-    sql: SqlSession,
-    anki: AnkiOrmSession,
-    s3: S3Client,
-    gen: GenApi,
-) -> File:
-
-    # Select the appropriate prompt based on cloze parameter
-    prompt = CLOZE_PROMPT if input.cloze else PROMPT
-
-    full_prompt = prompt + text
+async def generate_partial(gen: GenApi, prompt: str, chunk: str) -> AnkiCollection:
+    full_prompt = prompt + chunk
 
     payload = {
         "text": full_prompt,
@@ -201,16 +193,35 @@ async def generate_anki(
         result: dict = await response.json()
 
     generated_content = json.loads(result.get("text"))
-    validated_model: AnkiCollection = AnkiCollection.model_validate(generated_content)
+    return AnkiCollection.model_validate(generated_content)
 
-    file_id = uuid.uuid4()
-    card_type = "cloze" if input.cloze else "basic"
-    filename = f"{card_type}_{file_id}.apkg"
-    prefix = f"{user_id}/generated/{file_id}/{filename}"
 
-    await validated_model.add_to_sql(anki)
+@router.post("/", response_model=FileDataResponse, status_code=status.HTTP_201_CREATED)
+async def generate_anki(
+    input: YouTubeBody | FileBody,
+    text: GenText,
+    user_id: CurrentUserId,
+    sql: SqlSession,
+    anki: AnkiOrmSession,
+    s3: S3Client,
+    gen: GenApi,
+) -> File:
 
-    buffer = io.BytesIO()
+    prompt: str = CLOZE_PROMPT if input.cloze else PROMPT
+
+    chunks = tuple(text[i:i + CHUNK_SIZE] for i in range(0, len(text), CHUNK_SIZE))
+
+    if not len(chunks):
+        raise HTTPException(status_code=400, detail="No content to generate")
+
+    tasks = tuple(generate_partial(gen, prompt, chunk) for chunk in chunks)
+    partials = await asyncio.gather(*tasks)
+
+    merged: AnkiCollection = AnkiCollection.merge(*partials)
+
+    await merged.add_to_sql(anki)
+
+    buffer: io.BytesIO = io.BytesIO()
 
     def synchronous_dump(sync_conn: sqla.Connection) -> None:
         nonlocal buffer
@@ -226,6 +237,11 @@ async def generate_anki(
     with zf.ZipFile(zip_buffer := io.BytesIO(), "w", zf.ZIP_DEFLATED) as bundle:
         bundle.writestr("collection.anki2", buffer.getvalue())
     zip_buffer.seek(0)
+
+    file_id = uuid.uuid4()
+    card_type = "cloze" if input.cloze else "basic"
+    filename = f"{card_type}_{file_id}.apkg"
+    prefix = f"{user_id}/generated/{file_id}/{filename}"
 
     await s3.put_object(
         Bucket=BUCKET_NAME,

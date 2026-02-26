@@ -180,6 +180,62 @@ class AnkiCollection(BaseModel):
         if commit:
             await engine.commit()
 
+    @classmethod
+    def merge(cls, *collections: "AnkiCollection") -> "AnkiCollection":
+        """
+        Merge one or more AnkiCollection objects into a new AnkiCollection, remapping IDs to avoid collisions.
+        """
+        if not collections:
+            raise ValueError("At least one AnkiCollection must be provided")
+
+        import time
+
+        main_col = collections[0].col
+        all_notes = []
+        all_cards = []
+        all_revlog = []
+        all_graves = []
+
+        base_id = int(time.time() * 1000)
+        counter = 0
+
+        for partial in collections:
+            note_id_map = {}
+            card_id_map = {}
+
+            for note in partial.notes:
+                old_id = note.id
+                new_id = base_id + counter
+                counter += 1
+                note.id = new_id
+                note.mod = int(time.time())
+                note_id_map[old_id] = new_id
+                all_notes.append(note)
+
+            for card in partial.cards:
+                old_card_id = card.id
+                new_card_id = base_id + counter
+                counter += 1
+                card.id = new_card_id
+                card.nid = note_id_map.get(card.nid, card.nid)
+                card.mod = int(time.time())
+                card_id_map[old_card_id] = new_id
+                all_cards.append(card)
+
+            for rev in partial.revlog:
+                rev.cid = card_id_map.get(rev.cid, rev.cid)
+                all_revlog.append(rev)
+
+            all_graves.extend(partial.graves)
+
+        return cls(
+            col=main_col,
+            notes=all_notes,
+            cards=all_cards,
+            revlog=all_revlog,
+            graves=all_graves,
+        )
+
 
 def create_anki_tables(engine: "sqla.Connection") -> None:
     """Create all Anki collection tables in the database."""
