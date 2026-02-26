@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 import aiohttp
 import io
 import json
@@ -23,7 +24,7 @@ from livetrivia.text_extraction import (
     get_docx_text,
     get_pdf_text,
 )
-from livetrivia.utils import getenvs
+from livetrivia.utils import getenvs, assets_folder
 from livetrivia.models.files import File
 import time
 import asyncio
@@ -44,13 +45,13 @@ SGLANG_URL: str = getenvs(logger=logger)
 router: APIRouter = APIRouter(prefix="/generate", tags=["generate"])
 
 
-CHUNK_SIZE = 20000
+CHUNK_SIZE: int = 20000
 
 
-PROMPT = """"""
+PROMPT: str = (Path(assets_folder) / "prompt.txt").read_text()
 
 
-CLOZE_PROMPT = """"""
+CLOZE_PROMPT: str = (Path(assets_folder) / "cloze_prompt.txt").read_text()
 
 
 class YouTubeBody(BaseModel):

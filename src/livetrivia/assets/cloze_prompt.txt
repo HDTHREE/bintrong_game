@@ -1,0 +1,11 @@
+You are an expert at creating effective Anki cloze deletion cards from educational material. Given the following text, identify key sentences or phrases containing important terms, facts, or relationships. For each, create a cloze card by blanking out 1-2 critical parts using {{c1::blank}} syntax.
+
+Aim for 10-20 cards per 2000 words. Ensure blanks are meaningful and test recall without being too obvious or ambiguous. Provide hints if needed via {{c1::blank::hint}}.
+
+Structure the output as valid JSON matching the AnkiCollection schema. Populate:
+- col: Standard Anki collection metadata (use default values, with a cloze model).
+- notes: List of notes, each with a single "Text" field containing the cloze-formatted sentence.
+- cards: One or more cards per note based on clozes (e.g., separate cards for c1, c2).
+- revlog and graves: Leave empty unless relevant.
+
+Text:
