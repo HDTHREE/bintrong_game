@@ -7,7 +7,7 @@ import typing_extensions as tp
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict
 from sqlmodel import select
-from livetrivia.models.anki_deck import AnkiFile
+from livetrivia.models.anki_deck import AnkiCollection
 from livetrivia.models.files import FileDataResponse
 from livetrivia.routes.session import CurrentUserId
 from livetrivia.db import (
@@ -42,82 +42,10 @@ SGLANG_URL: str = getenvs(logger=logger)
 router: APIRouter = APIRouter(prefix="/generate", tags=["generate"])
 
 
-PROMPT = """You are an expert flashcard creator. Generate high-quality Anki flashcards from the provided text content.
-
-## Instructions
-1. Extract key concepts, facts, definitions, and relationships from the text
-2. Create clear, concise question-answer pairs that test understanding
-3. Each card should focus on ONE concept or fact
-4. Questions should be specific and unambiguous
-5. Answers should be brief but complete
-6. Avoid trivial or overly obvious questions
-7. Create 10-25 cards depending on content density
-
-## Output Structure
-Generate a valid AnkiModel JSON with:
-- `col`: Collection metadata with a Basic note type model
-- `notes`: Array of notes where `flds` contains "Front\\x1fBack" (question and answer separated by \\x1f)
-- `cards`: Array of cards referencing the notes
-
-## Col Configuration
-- Use model ID 1 for Basic cards
-- Use deck ID 1 for the default deck
-- Set `mid` in notes to match the model ID
-- Set `did` in cards to match the deck ID
-- Use current epoch milliseconds for timestamps and IDs (ensure uniqueness)
-- `guid` should be a unique 10-character alphanumeric string per note
-- `csum` should be a simple hash (use first 8 digits of note ID)
-- `sfld` should match the front field content
-
-## Example Note Format
-For a question "What is the capital of France?" with answer "Paris":
-- `flds`: "What is the capital of France?\\x1fParis"
-- `sfld`: "What is the capital of France?"
-
-## Text Content to Process:
-"""
+PROMPT = """"""
 
 
-CLOZE_PROMPT = """You are an expert flashcard creator. Generate high-quality Anki cloze deletion flashcards from the provided text content.
-
-## Instructions
-1. Extract key concepts, facts, definitions, and relationships from the text
-2. Create cloze deletions that hide important terms, definitions, or concepts
-3. Use {{c1::hidden text}} syntax for cloze deletions
-4. Each note can have multiple cloze deletions (c1, c2, c3...) to create multiple cards
-5. Provide enough context around the cloze for meaningful recall
-6. Avoid hiding trivial words or creating ambiguous blanks
-7. Create 10-25 notes depending on content density
-
-## Output Structure
-Generate a valid AnkiModel JSON with:
-- `col`: Collection metadata with a Cloze note type model
-- `notes`: Array of notes where `flds` contains the cloze text (with optional extra field separated by \\x1f)
-- `cards`: Array of cards referencing the notes (one card per cloze number)
-
-## Col Configuration
-- Use model ID 2 for Cloze cards
-- Use deck ID 1 for the default deck
-- Set `mid` in notes to match the model ID
-- Set `did` in cards to match the deck ID
-- Use current epoch milliseconds for timestamps and IDs (ensure uniqueness)
-- `guid` should be a unique 10-character alphanumeric string per note
-- `csum` should be a simple hash (use first 8 digits of note ID)
-- `sfld` should be the text with cloze markers stripped
-- For notes with c1, c2, etc., create corresponding cards with `ord` 0, 1, etc.
-
-## Example Cloze Formats
-Single cloze: "The capital of France is {{c1::Paris}}"
-Multiple clozes: "{{c1::Python}} is a {{c2::programming language}} created by {{c3::Guido van Rossum}}"
-
-## Example Note Format
-For "The mitochondria is the {{c1::powerhouse}} of the {{c2::cell}}":
-- `flds`: "The mitochondria is the {{c1::powerhouse}} of the {{c2::cell}}\\x1f"
-- `sfld`: "The mitochondria is the powerhouse of the cell"
-- Create 2 cards: one with ord=0 (for c1), one with ord=1 (for c2)
-
-## Text Content to Process:
-"""
+CLOZE_PROMPT = """"""
 
 
 class YouTubeBody(BaseModel):
@@ -233,6 +161,8 @@ async def get_gen_text(
 
 
 GenApi: tp.TypeAlias = tp.Annotated[aiohttp.ClientSession, Depends(get_gen_api)]
+
+
 GenText: tp.TypeAlias = tp.Annotated[str, Depends(get_gen_text)]
 
 
@@ -257,7 +187,7 @@ async def generate_anki(
         "sampling_params": {
             "temperature": 0.7,
             "max_new_tokens": 26000,
-            "json_schema": json.dumps(AnkiFile.model_json_schema()),
+            "json_schema": json.dumps(AnkiCollection.model_json_schema()),
         },
     }
 
@@ -271,7 +201,7 @@ async def generate_anki(
         result: dict = await response.json()
 
     generated_content = json.loads(result.get("text"))
-    validated_model: AnkiFile = AnkiFile.model_validate(generated_content)
+    validated_model: AnkiCollection = AnkiCollection.model_validate(generated_content)
 
     file_id = uuid.uuid4()
     card_type = "cloze" if input.cloze else "basic"

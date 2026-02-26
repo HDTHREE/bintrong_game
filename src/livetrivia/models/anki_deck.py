@@ -13,73 +13,6 @@ if tp.TYPE_CHECKING:
     from pydantic_core.core_schema import CoreSchema
 
 
-def creatable[T: type[BaseModel]](
-    defaults: dict,
-    *args: list[T],
-) -> T | tp.Callable[[T], T]:
-    """Decorator that adds a `create` classmethod with defaults partially applied."""
-
-    def decorator(cls: T) -> T:
-        @classmethod
-        def create(cls_: type, *a, **kwargs):
-            """Create an instance with default values pre-applied."""
-            nonlocal defaults
-            merged = {**defaults, **kwargs}
-            return cls_(*a, **merged)
-
-        setattr(cls, "create", create)
-
-        class GenerateCreateJsonSchema(GenerateJsonSchema):
-            """Custom schema generator class to ignore provided (default) fields."""
-
-            def generate(
-                self: tp.Self, schema: "CoreSchema", mode: JsonSchemaMode = "validation"
-            ) -> JsonSchemaValue:
-                nonlocal defaults
-                json_schema: JsonSchemaValue = super().generate(schema, mode)
-                # Remove properties that have defaults
-                if "properties" in json_schema:
-                    for key in defaults:
-                        json_schema["properties"].pop(key, None)
-                # Update required to not include defaulted fields
-                if "required" in json_schema:
-                    json_schema["required"] = [
-                        r for r in json_schema["required"] if r not in defaults
-                    ]
-                return json_schema
-
-        @classmethod
-        def create_json_schema(
-            _: type,
-        ):
-            """Custom create json schema json that generates a schema for the required form information to create an entry."""
-            nonlocal GenerateCreateJsonSchema
-            return cls.model_json_schema(schema_generator=GenerateCreateJsonSchema)
-
-        setattr(cls, "create_json_schema", create_json_schema)
-
-        return cls
-
-    if args:
-        *_, c = args
-        return decorator(c)
-
-    return decorator
-
-
-@creatable(
-    {
-        "ver": 11,
-        "dty": 0,
-        "usn": -1,
-        "ls": 0,
-        "conf": "{}",
-        "models": "{}",
-        "decks": "{}",
-        "dconf": "{}",
-        "tags": "{}",
-    }
-)
 class Col(SQLModel, table=True):
     """Collection metadata table.
 
@@ -104,14 +37,6 @@ class Col(SQLModel, table=True):
     tags: str = Field(description="JSON object of tags cache")
 
 
-@creatable(
-    {
-        "usn": -1,
-        "tags": "",
-        "flags": 0,
-        "data": "",
-    }
-)
 class Note(SQLModel, table=True):
     """Notes table.
 
@@ -140,22 +65,6 @@ class Note(SQLModel, table=True):
     data: str = Field(default="", description="Unused data field")
 
 
-@creatable(
-    {
-        "usn": -1,
-        "type": 0,
-        "queue": 0,
-        "ivl": 0,
-        "factor": 0,
-        "reps": 0,
-        "lapses": 0,
-        "left": 0,
-        "odue": 0,
-        "odid": 0,
-        "flags": 0,
-        "data": "",
-    }
-)
 class Card(SQLModel, table=True):
     """Cards table.
 
@@ -205,11 +114,6 @@ class Card(SQLModel, table=True):
     data: str = Field(default="", description="Unused data field")
 
 
-@creatable(
-    {
-        "usn": -1,
-    }
-)
 class RevLog(SQLModel, table=True):
     """Review log table.
 
@@ -239,7 +143,6 @@ class RevLog(SQLModel, table=True):
     )
 
 
-@creatable({})
 class Grave(SQLModel, table=True):
     """Graves table.
 
@@ -253,7 +156,7 @@ class Grave(SQLModel, table=True):
     type: int = Field(primary_key=True, description="Type: 0=card, 1=note, 2=deck")
 
 
-class AnkiFile(BaseModel):
+class AnkiCollection(BaseModel):
     col: Col
     notes: list[Note]
     cards: list[Card]
