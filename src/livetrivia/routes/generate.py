@@ -1,7 +1,9 @@
 import logging
 from pathlib import Path
+import tempfile as tf
 import aiohttp
 import io
+import os
 import json
 import zipfile as zf
 import typing_extensions as tp
@@ -11,6 +13,7 @@ from sqlmodel import select
 from livetrivia.models.anki_deck import AnkiCollection
 from livetrivia.models.files import FileDataResponse
 from livetrivia.routes.session import CurrentUserId
+import sqlalchemy as sqla
 from livetrivia.db import (
     SqlSession,
     S3Client,
@@ -26,12 +29,10 @@ from livetrivia.text_extraction import (
 )
 from livetrivia.utils import getenvs, assets_folder
 from livetrivia.models.files import File
-import time
 import asyncio
 
 if tp.TYPE_CHECKING:
     from pydantic import ConfigDict
-    import sqlalchemy as sqla
 
 
 logger: logging.Logger = logging.Logger(__name__)
@@ -57,9 +58,6 @@ CLOZE_PROMPT: str = (Path(assets_folder) / "cloze_prompt.txt").read_text()
 class YouTubeBody(BaseModel):
     """Request body for `/api/generate/`. Allows for generation of anki deck based on youtube URL."""
 
-    model_config: "ConfigDict" = {"arbitrary_types_allowed": True}
-    """Model config needed to set this class to be mutuable within `get_gen_text`."""
-
     video: str
     """URL of video. Can include full-url or video id."""
 
@@ -67,23 +65,31 @@ class YouTubeBody(BaseModel):
     """Whether or not to generate an anki cloze (fill-in-blank)."""
 
     file_id: uuid.UUID | None = None
-    """**OMIT:** Modified inplace within dependency."""
+    """**OMIT**."""
 
 
 class FileBody(BaseModel):
     """Request body for `/api/generate/`. Allows for generation of anki deck based on existing file object."""
 
     file_id: uuid.UUID
+    """File ID to use to generate the deck from."""
+
     cloze: bool
+    """Whether or not to generate an anki cloze (fill-in-blank)."""
 
     @property
-    def video(self):
+    def video(self) -> None:
+        """**OMIT**."""
         return None
 
 
 async def get_gen_api(url: str = Depends(lambda: SGLANG_URL)):
-    timeout = aiohttp.ClientTimeout(total=300)
-    yield aiohttp.ClientSession(base_url=url, timeout=timeout)
+    timeout = aiohttp.ClientTimeout(total=600)
+    session = aiohttp.ClientSession(base_url=url, timeout=timeout)
+    try:
+        yield session
+    finally:
+        await session.close()
 
 
 async def get_gen_text(
@@ -130,11 +136,16 @@ async def get_gen_text(
     ).scalar_one_or_none()
 
     if existing_file is not None:
-        # Transcript exists, fetch.
-        resp = await s3.get_object(Bucket=BUCKET_NAME, Key=script_prefix)
-        text = (await resp["Body"].read()).decode("utf-8")
-        input.file_id = existing_file.id
-        return text
+        try:
+            # Transcript exists, fetch.
+            resp = await s3.get_object(Bucket=BUCKET_NAME, Key=script_prefix)
+            text = (await resp["Body"].read()).decode("utf-8")
+            input.file_id = existing_file.id
+        except:
+            # If we fail we will just go get it.
+            pass
+        else:
+            return text
 
     # Transcript not found, fetch.
     video = yt.fetch(video_id)
@@ -150,14 +161,16 @@ async def get_gen_text(
         generated_from_id=None,
     )
 
-    input.file_id = script_file.id
-
     await s3.put_object(
         Bucket=BUCKET_NAME,
         Key=script_prefix,
         Body=text.encode("utf-8"),
         ContentType="application/json",
     )
+
+    if existing_file is not None:
+        return text
+
 
     sql.add(script_file)
     await sql.commit()
@@ -193,7 +206,15 @@ async def generate_partial(gen: GenApi, prompt: str, chunk: str) -> AnkiCollecti
             )
         result: dict = await response.json()
 
-    generated_content = json.loads(result.get("text"))
+    text = result.get("text")
+    try:
+        generated_content = json.loads(text)
+    except json.JSONDecodeError as e:
+        logging.error(f"JSON decode error: {e}\nRaw text: {text}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Malformed JSON from generation API: {e}"
+        )
     return AnkiCollection.model_validate(generated_content)
 
 
@@ -222,22 +243,19 @@ async def generate_anki(
 
     await merged.add_to_sql(anki)
 
-    buffer: io.BytesIO = io.BytesIO()
-
-    def synchronous_dump(sync_conn: sqla.Connection) -> None:
-        nonlocal buffer
-        with open(buffer, "w") as file:
-            for line in sync_conn.iterdump():
-                file.write("%s\n" % line)
-        buffer.seek(0)
-
-    async with await anki.connection() as connection:
-        await connection.run_sync(synchronous_dump)
-
     # Create an in-memory zip file with collection.anki2
-    with zf.ZipFile(zip_buffer := io.BytesIO(), "w", zf.ZIP_DEFLATED) as bundle:
-        bundle.writestr("collection.anki2", buffer.getvalue())
-    zip_buffer.seek(0)
+    with (
+        zf.ZipFile(zip_buffer := io.BytesIO(), "w", zf.ZIP_DEFLATED) as bundle,
+        tf.NamedTemporaryFile(suffix=".anki2") as tmp
+    ):
+        tmp_path: str = os.path.realpath(tmp.name)
+        stmt = sqla.text(f'VACUUM INTO "{tmp_path}"')
+        await anki.execute(stmt)
+        await anki.commit()
+        await anki.close()
+
+        bundle.write(tmp_path, "collection.anki2")
+
 
     file_id = uuid.uuid4()
     card_type = "cloze" if input.cloze else "basic"
@@ -252,9 +270,17 @@ async def generate_anki(
     )
 
     if input.file_id is None:
-        raise HTTPException(404)
+        *_, video_id = input.video.strip().split(YOUTUBE_VIDEO_PREFIX)
+        script_prefix = f"{user_id}/scripts/{video_id}/transcript.json"
+        if (
+            script := (
+                await sql.execute(select(File).where(File.prefix == script_prefix))
+            ).scalar_one_or_none()
+        ) is None:
+            raise HTTPException(404)
+        input.file_id = script.id
 
-    new_file = File(
+    new_file: File = File(
         id=file_id,
         prefix=prefix,
         user_id=user_id,

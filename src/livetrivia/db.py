@@ -56,15 +56,16 @@ async def get_sql_session(
 
 async def new_inmemory_anki_orm(
     async_engine: sqlas.AsyncEngine = Depends(new_inmemory_sql_engine),
-) -> tp.AsyncGenerator[sqlas.AsyncEngine]:
+) -> tp.AsyncGenerator[sqlas.AsyncSession]:
     """SQLAlchemy Async Session dependency async generator for Anki ORM. Since this database is re-created each time, tables are set each time as well."""
     # Create Anki tables.
     async with async_engine.begin() as connection:
         await connection.run_sync(create_anki_tables)
     # Create and yield the session.
-    async_session: sqlorm.Session = sqlorm.sessionmaker(
+    async_session = sqlorm.sessionmaker(
         bind=async_engine, class_=sqlas.AsyncSession, expire_on_commit=False
     )
+    session: sqlas.AsyncSession
     async with async_session() as session:
         yield session
 
@@ -112,6 +113,8 @@ async def lifespan(_: "FastAPI") -> tp.AsyncGenerator[None, None]:
     get_sql_engine_context: cl.AbstractAsyncContextManager = cl.asynccontextmanager(
         get_sql_engine
     )
+    engine: sqlas.AsyncEngine
+    connection: sqlas.AsyncConnection
     async with get_sql_engine_context(SQL_URL) as engine, engine.begin() as connection:
         await connection.run_sync(SQLModel.metadata.create_all)
         yield

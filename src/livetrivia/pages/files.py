@@ -32,20 +32,26 @@ layout: dmc.AppShellMain = dmc.AppShellMain(
             children=dmc.Stack(
                 children=[
                     dmc.Title("Your Files", order=2),
+                    dmc.Flex(
+                        w="100%",
+                        justify="space-around",
+                        children=[
                     dmc.Button(
                         upload := dash.dcc.Upload(
                             children=dmc.Text(children="Upload File"),
                             multiple=False,
-                            style={"marginBottom": "1rem", "width": "fit-content"},
                             accept=",".join(EXTS),
                         ),
+                        w="48%",
                         leftSection=di.DashIconify(icon="ic:round-file-upload"),
                     ),
                     yt_button := dmc.Button(
                         children="YouTube",
                         color="red",
+                        w="48%",
                         leftSection=di.DashIconify(icon="ic:outline-ondemand-video"),
                     ),
+                    ]),
                     grid := dag.AgGrid(
                         columnDefs=[
                             {
@@ -100,12 +106,6 @@ layout: dmc.AppShellMain = dmc.AppShellMain(
         h="100vh",
         style={"overflow": "hidden", "boxSizing": "border-box"},
     ),
-    style={
-        "width": "100vw",
-        "height": "100vh",
-        "overflow": "hidden",
-        "boxSizing": "border-box",
-    },
 )
 """Layout for files page. Embedded into `livetrivia._app` at `dash.page_container`."""
 
@@ -146,13 +146,13 @@ async def handle_file_action(
     if not render_data or not token or not token.get("access_token"):
         raise de.PreventUpdate()
     try:
-        row_id: int = int(render_data.get["rowId"])
-        action: str = str(render_data.get["colId"])
+        row_id: int = int(render_data.get("rowId"))
+        action: str = str(render_data.get("colId"))
 
         access_token: str = str(token["access_token"])
 
         row: dict = row_data[row_id]
-        file_id: str = str(row.get["id"])
+        file_id: str = str(row.get("id"))
     except KeyError as e:
         raise de.PreventUpdate() from e
 
