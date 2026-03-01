@@ -32,8 +32,6 @@ async def get_sql_engine(
 
 async def new_inmemory_sql_engine() -> tp.AsyncGenerator[sqlas.AsyncEngine]:
     """Dependency async generator that yields an async SQLAlchemy engine (in-memory SQLite). Anki use case (i.e. tables are created)."""
-    # Create an in-memory SQLite engine. Note that this database is re-created each time (i.e. it is ephemeral).
-    # This table isn't even persisted between API calls. This depedency simply provides a fresh in-memory database each time it is called for `.db` file generation.
     async for engine in _get_sql_engine("sqlite+aiosqlite:///:memory:"):
         yield engine
 
@@ -58,9 +56,10 @@ async def new_inmemory_anki_orm(
     async_engine: sqlas.AsyncEngine = Depends(new_inmemory_sql_engine),
 ) -> tp.AsyncGenerator[sqlas.AsyncSession]:
     """SQLAlchemy Async Session dependency async generator for Anki ORM. Since this database is re-created each time, tables are set each time as well."""
-    # Create Anki tables.
+    # Create Anki tables (legacy tables ONLY — Anki itself will upgrade the schema on import).
     async with async_engine.begin() as connection:
         await connection.run_sync(create_anki_tables)
+
     # Create and yield the session.
     async_session = sqlorm.sessionmaker(
         bind=async_engine, class_=sqlas.AsyncSession, expire_on_commit=False
@@ -81,7 +80,6 @@ async def get_s3_client(
     aws_session: aioboto3.Session = Depends(get_s3_session),
 ) -> "tp.AsyncGenerator[aiob3t.S3Client]":
     """Aioboto3 S3 Client dependency async generator."""
-    # Use dummy AWS credentials for localstack/testing.
     aws_access_key_id, aws_secret_access_key = ("test", "test")
 
     async with aws_session.client(

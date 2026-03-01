@@ -8,7 +8,7 @@ import json
 import zipfile as zf
 import typing_extensions as tp
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel
 from sqlmodel import select
 from livetrivia.models.anki_deck import AnkiCollection
 from livetrivia.models.files import FileDataResponse
@@ -31,9 +31,6 @@ from livetrivia.utils import getenvs, assets_folder
 from livetrivia.models.files import File
 import asyncio
 
-if tp.TYPE_CHECKING:
-    from pydantic import ConfigDict
-
 
 logger: logging.Logger = logging.Logger(__name__)
 """Logger for generate module to log failures to."""
@@ -48,6 +45,24 @@ router: APIRouter = APIRouter(prefix="/generate", tags=["generate"])
 
 CHUNK_SIZE: int = 20000
 
+
+DEFAULT_NOTETYPE = {
+    "id": 1,
+    "name": "Basic",
+    "mtime_secs": 0,
+    "usn": 0,
+    "config": json.dumps(
+        {
+            "name": "Basic",
+            "type": 0,
+            "fields": [{"name": "Front"}, {"name": "Back"}],
+            "templates": [
+                {"name": "Card 1", "qfmt": "{{Front}}", "afmt": "{{Back}}"}
+            ],
+            "css": ".card { font-family: arial; font-size: 20px; color: black; background-color: white; }",
+        }
+    ),
+}
 
 PROMPT: str = (Path(assets_folder) / "prompt.txt").read_text()
 
@@ -141,7 +156,7 @@ async def get_gen_text(
             resp = await s3.get_object(Bucket=BUCKET_NAME, Key=script_prefix)
             text = (await resp["Body"].read()).decode("utf-8")
             input.file_id = existing_file.id
-        except:
+        except:  # noqa: E722
             # If we fail we will just go get it.
             pass
         else:
@@ -170,7 +185,6 @@ async def get_gen_text(
 
     if existing_file is not None:
         return text
-
 
     sql.add(script_file)
     await sql.commit()
@@ -212,8 +226,7 @@ async def generate_partial(gen: GenApi, prompt: str, chunk: str) -> AnkiCollecti
     except json.JSONDecodeError as e:
         logging.error(f"JSON decode error: {e}\nRaw text: {text}")
         raise HTTPException(
-            status_code=500,
-            detail=f"Malformed JSON from generation API: {e}"
+            status_code=500, detail=f"Malformed JSON from generation API: {e}"
         )
     return AnkiCollection.model_validate(generated_content)
 
@@ -231,7 +244,7 @@ async def generate_anki(
 
     prompt: str = CLOZE_PROMPT if input.cloze else PROMPT
 
-    chunks = tuple(text[i:i + CHUNK_SIZE] for i in range(0, len(text), CHUNK_SIZE))
+    chunks = tuple(text[i : i + CHUNK_SIZE] for i in range(0, len(text), CHUNK_SIZE))
 
     if not len(chunks):
         raise HTTPException(status_code=400, detail="No content to generate")
@@ -240,13 +253,21 @@ async def generate_anki(
     partials = await asyncio.gather(*tasks)
 
     merged: AnkiCollection = AnkiCollection.merge(*partials)
+    merged.col.id = 1
 
     await merged.add_to_sql(anki)
+
+    # stmt = sqla.text("INSERT INTO notetypes (id, name, mtime_secs, usn, config) VALUES (:id, :name, :mtime_secs, :usn, :config)")
+    # await anki.execute(stmt, DEFAULT_NOTETYPE)
+    # await anki.commit()
+
+    await anki.execute(sqla.text("PRAGMA legacy_file_format = ON"))
+    await anki.commit()
 
     # Create an in-memory zip file with collection.anki2
     with (
         zf.ZipFile(zip_buffer := io.BytesIO(), "w", zf.ZIP_DEFLATED) as bundle,
-        tf.NamedTemporaryFile(suffix=".anki2") as tmp
+        tf.NamedTemporaryFile(suffix=".anki2") as tmp,
     ):
         tmp_path: str = os.path.realpath(tmp.name)
         stmt = sqla.text(f'VACUUM INTO "{tmp_path}"')
@@ -255,7 +276,7 @@ async def generate_anki(
         await anki.close()
 
         bundle.write(tmp_path, "collection.anki2")
-
+        bundle.writestr("media", r"{}")
 
     file_id = uuid.uuid4()
     card_type = "cloze" if input.cloze else "basic"

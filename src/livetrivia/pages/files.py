@@ -36,22 +36,25 @@ layout: dmc.AppShellMain = dmc.AppShellMain(
                         w="100%",
                         justify="space-around",
                         children=[
-                    dmc.Button(
-                        upload := dash.dcc.Upload(
-                            children=dmc.Text(children="Upload File"),
-                            multiple=False,
-                            accept=",".join(EXTS),
-                        ),
-                        w="48%",
-                        leftSection=di.DashIconify(icon="ic:round-file-upload"),
+                            dmc.Button(
+                                upload := dash.dcc.Upload(
+                                    children=dmc.Text(children="Upload File"),
+                                    multiple=False,
+                                    accept=",".join(EXTS),
+                                ),
+                                w="48%",
+                                leftSection=di.DashIconify(icon="ic:round-file-upload"),
+                            ),
+                            yt_button := dmc.Button(
+                                children="YouTube",
+                                color="red",
+                                w="48%",
+                                leftSection=di.DashIconify(
+                                    icon="ic:outline-ondemand-video"
+                                ),
+                            ),
+                        ],
                     ),
-                    yt_button := dmc.Button(
-                        children="YouTube",
-                        color="red",
-                        w="48%",
-                        leftSection=di.DashIconify(icon="ic:outline-ondemand-video"),
-                    ),
-                    ]),
                     grid := dag.AgGrid(
                         columnDefs=[
                             {
