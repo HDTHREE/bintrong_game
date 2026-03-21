@@ -198,92 +198,132 @@ class AnkiCollection(BaseModel):
     ) -> None:
         self.col.ver = 11
         if not self.col.conf or not self._is_valid_json(self.col.conf):
-            self.col.conf = json.dumps({
-                "curDeck": 1,
-                "activeDecks": [1],
-                "newSpread": 0,
-                "collapseTime": 1200,
-                "timeLim": 600,
-                "estTimes": True,
-                "dueCounts": True,
-                "curModel": "1",
-                "nextPos": 1,
-                "sortType": "noteFld",
-                "sortBackwards": False,
-                "addToCur": True,
-                "dayLearnFirst": False,
-                "newBury": True
-            })
+            self.col.conf = json.dumps(
+                {
+                    "curDeck": 1,
+                    "activeDecks": [1],
+                    "newSpread": 0,
+                    "collapseTime": 1200,
+                    "timeLim": 600,
+                    "estTimes": True,
+                    "dueCounts": True,
+                    "curModel": "1",
+                    "nextPos": 1,
+                    "sortType": "noteFld",
+                    "sortBackwards": False,
+                    "addToCur": True,
+                    "dayLearnFirst": False,
+                    "newBury": True,
+                }
+            )
         if not self.col.models or not self._is_valid_json(self.col.models):
-            tmpls = [{
-                "name": "Card 1",
-                "qfmt": "{{Front}}",
-                "afmt": "{{Back}}",
-                "bafmt": "",
-                "bqfmt": "",
-                "did": None,
-                "ord": 0
-            }]
-            flds = [
-                {"name": "Front", "sticky": False, "font": "Arial", "media": [], "ord": 0, "rtl": False, "size": 20}
+            tmpls = [
+                {
+                    "name": "Card 1",
+                    "qfmt": "{{Front}}",
+                    "afmt": "{{Back}}",
+                    "bafmt": "",
+                    "bqfmt": "",
+                    "did": None,
+                    "ord": 0,
+                }
             ]
-            self.col.models = json.dumps({
-                "1": {
-                    "css": ".card { font-family: arial; font-size: 20px; color: black; background-color: white; }",
-                    "did": 1,
-                    "flds": flds,
-                    "id": 1,
-                    "latexPost": "\\end{document}",
-                    "latexPre": "\\documentclass[12pt]{article}\\special{papersize=3in,5in}\\usepackage[utf8]{inputenc}\\usepackage{amssymb,amsmath}\\pagestyle{empty}",
-                    "mod": 0,
-                    "name": "Basic",
-                    "req": [[0, "all", [0]]],
-                    "sortf": 0,
-                    "tags": [],
-                    "tmpls": tmpls,
-                    "type": 0,
-                    "usn": 0,
-                    "vers": []
+            flds = [
+                {
+                    "name": "Front",
+                    "sticky": False,
+                    "font": "Arial",
+                    "media": [],
+                    "ord": 0,
+                    "rtl": False,
+                    "size": 20,
                 }
-            })
+            ]
+            self.col.models = json.dumps(
+                {
+                    "1": {
+                        "css": ".card { font-family: arial; font-size: 20px; color: black; background-color: white; }",
+                        "did": 1,
+                        "flds": flds,
+                        "id": 1,
+                        "latexPost": "\\end{document}",
+                        "latexPre": "\\documentclass[12pt]{article}\\special{papersize=3in,5in}\\usepackage[utf8]{inputenc}\\usepackage{amssymb,amsmath}\\pagestyle{empty}",
+                        "mod": 0,
+                        "name": "Basic",
+                        "req": [[0, "all", [0]]],
+                        "sortf": 0,
+                        "tags": [],
+                        "tmpls": tmpls,
+                        "type": 0,
+                        "usn": 0,
+                        "vers": [],
+                    }
+                }
+            )
         if not self.col.decks or not self._is_valid_json(self.col.decks):
-            self.col.decks = json.dumps({
-                "1": {
-                    "name": "Default",
-                    "id": 1,
-                    "mod": 0,
-                    "usn": 0,
-                    "desc": "",
-                    "dyn": 0,
-                    "collapsed": False,
-                    "browserCollapsed": False,
-                    "extendRev": 10,
-                    "extendNew": 10,
-                    "conf": 1,
-                    "revToday": [0, 0],
-                    "newToday": [0, 0],
-                    "lrnToday": [0, 0],
-                    "timeToday": [0, 0],
-                    "md": False
+            self.col.decks = json.dumps(
+                {
+                    "1": {
+                        "name": "Default",
+                        "id": 1,
+                        "mod": 0,
+                        "usn": 0,
+                        "desc": "",
+                        "dyn": 0,
+                        "collapsed": False,
+                        "browserCollapsed": False,
+                        "extendRev": 10,
+                        "extendNew": 10,
+                        "conf": 1,
+                        "revToday": [0, 0],
+                        "newToday": [0, 0],
+                        "lrnToday": [0, 0],
+                        "timeToday": [0, 0],
+                        "md": False,
+                    }
                 }
-            })
+            )
         if not self.col.dconf or not self._is_valid_json(self.col.dconf):
-            self.col.dconf = json.dumps({
-                "1": {
-                    "name": "Default",
-                    "replayq": True,
-                    "lapse": {"delays": [10], "leechFails": 8, "minInt": 1, "mult": 0.0, "leechAction": 0},
-                    "rev": {"perDay": 100, "fuzz": 0.05, "ivlFct": 1, "maxIvl": 36500, "minSpace": 1, "ease4": 1.3, "bury": True},
-                    "timer": 0,
-                    "autoplay": True,
-                    "dyn": False,
-                    "mod": 0,
-                    "usn": 0,
-                    "new": {"perDay": 20, "delays": [1, 10], "separate": True, "ints": [1, 4, 7], "initialFactor": 2500, "bury": True, "order": 1},
-                    "maxTaken": 60,
-                    "id": 1
+            self.col.dconf = json.dumps(
+                {
+                    "1": {
+                        "name": "Default",
+                        "replayq": True,
+                        "lapse": {
+                            "delays": [10],
+                            "leechFails": 8,
+                            "minInt": 1,
+                            "mult": 0.0,
+                            "leechAction": 0,
+                        },
+                        "rev": {
+                            "perDay": 100,
+                            "fuzz": 0.05,
+                            "ivlFct": 1,
+                            "maxIvl": 36500,
+                            "minSpace": 1,
+                            "ease4": 1.3,
+                            "bury": True,
+                        },
+                        "timer": 0,
+                        "autoplay": True,
+                        "dyn": False,
+                        "mod": 0,
+                        "usn": 0,
+                        "new": {
+                            "perDay": 20,
+                            "delays": [1, 10],
+                            "separate": True,
+                            "ints": [1, 4, 7],
+                            "initialFactor": 2500,
+                            "bury": True,
+                            "order": 1,
+                        },
+                        "maxTaken": 60,
+                        "id": 1,
+                    }
                 }
-            })
+            )
         if not self.col.tags or not self._is_valid_json(self.col.tags):
             self.col.tags = "{}"
         engine.add(self.col)

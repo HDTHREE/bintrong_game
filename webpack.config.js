@@ -10,6 +10,13 @@ module.exports = {
 		static: './dist',
 		hot: true,
 		open: true,
+		proxy: [
+			{
+				context: ['/socket.io'],
+				target: 'http://localhost:3000',
+				ws: true,
+			},
+		],
 	},
 	module: {
 		rules: [

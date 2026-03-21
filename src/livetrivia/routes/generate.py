@@ -56,9 +56,7 @@ DEFAULT_NOTETYPE = {
             "name": "Basic",
             "type": 0,
             "fields": [{"name": "Front"}, {"name": "Back"}],
-            "templates": [
-                {"name": "Card 1", "qfmt": "{{Front}}", "afmt": "{{Back}}"}
-            ],
+            "templates": [{"name": "Card 1", "qfmt": "{{Front}}", "afmt": "{{Back}}"}],
             "css": ".card { font-family: arial; font-size: 20px; color: black; background-color: white; }",
         }
     ),

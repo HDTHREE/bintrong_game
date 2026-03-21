@@ -4,7 +4,10 @@
   "main": "index.js",
   "scripts": {
     "dev": "webpack serve",
+    "dev:server": "npx tsc -p tsconfig.server.json && node dist-server/server.js",
     "build": "webpack --mode production",
+    "build:server": "npx tsc -p tsconfig.server.json",
+    "start": "node dist-server/server.js",
     "lint": "xo --fix && uvx ruff check && uvx ruff format",
     "install:venv": "uv sync --all-extras",
     "install:mistral": "mkdir -p models/mistral-7b && uvx --from huggingface_hub hf download mistralai/Mistral-7B-Instruct-v0.3 --local-dir ./models/mistral-7b",
@@ -17,9 +20,13 @@
   "author": "HDTHREE",
   "dependencies": {
     "@types/three": "^0.181.0",
+    "express": "^5.2.1",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
     "three": "^0.181.1"
   },
   "devDependencies": {
+    "@types/express": "^4.17.25",
     "copy-webpack-plugin": "^13.0.1",
     "html-webpack-plugin": "^5.6.4",
     "ts-loader": "^9.5.4",
@@ -29,6 +36,9 @@
     "xo": "^1.2.3"
   },
   "xo": {
-    "ignores": ["webpack.config.js", "src/**/index.{js,ts,jsx,tsx}"]
+    "ignores": [
+      "webpack.config.js",
+      "src/**/index.{js,ts,jsx,tsx}"
+    ]
   }
 }
