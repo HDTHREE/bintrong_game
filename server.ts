@@ -83,6 +83,52 @@ io.on('connection', socket => {
 		});
 	});
 
+	socket.on('attack', (data: {x: number; z: number; rotationY: number}) => {
+		const attackRange = 1;
+		const coneHalfAngle = Math.PI / 3;
+		const knockbackDist = 1;
+		const halfBound = 7.5; // (platformSize / 2) - 0.5
+
+		const forwardX = Math.sin(data.rotationY);
+		const forwardZ = Math.cos(data.rotationY);
+
+		for (const [id, target] of players) {
+			if (id === socket.id) {
+				continue;
+			}
+
+			const dx = target.x - data.x;
+			const dz = target.z - data.z;
+			const dist = Math.hypot(dx, dz);
+
+			if (dist <= 0 || dist >= attackRange) {
+				continue;
+			}
+
+			const toTargetX = dx / dist;
+			const toTargetZ = dz / dist;
+			const dot = forwardX * toTargetX + forwardZ * toTargetZ;
+			const angle = Math.acos(Math.min(1, Math.max(-1, dot)));
+
+			if (angle < coneHalfAngle) {
+				target.x += toTargetX * knockbackDist;
+				target.z += toTargetZ * knockbackDist;
+				// Clamp to platform bounds
+				target.x = Math.max(-halfBound, Math.min(halfBound, target.x));
+				target.z = Math.max(-halfBound, Math.min(halfBound, target.z));
+
+				io.to(id).emit('knockback', {x: target.x, z: target.z});
+			}
+		}
+
+		socket.broadcast.emit('playerAttacked', {
+			id: socket.id,
+			x: data.x,
+			z: data.z,
+			rotationY: data.rotationY,
+		});
+	});
+
 	socket.on('disconnect', () => {
 		console.log(`Player disconnected: ${socket.id}`);
 		players.delete(socket.id);
@@ -90,7 +136,7 @@ io.on('connection', socket => {
 	});
 });
 
-const port = Number(process.env.PORT) || 3000;
+const port: Number = Number(process.env.PORT) || 3000;
 httpServer.listen(port, () => {
 	console.log(`Game server listening on http://localhost:${port}`);
 });

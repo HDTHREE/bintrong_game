@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js';
-import {connect, sendUpdate, type RemotePlayerData} from './network';
+import {connect, sendUpdate, sendAttack, type RemotePlayerData} from './network';
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x11_11_11);
@@ -47,6 +47,10 @@ let idleActions: THREE.AnimationAction[] = [];
 let currentAction: THREE.AnimationAction | undefined;
 let currentIdleIndex = -1;
 let currentAnimName = 'idle';
+
+const attackCooldown = 0.6;
+let attackTimer = 0;
+let isAttacking = false;
 
 let localModelFile = 'Colobus_Animations.glb';
 
@@ -100,6 +104,9 @@ function loadLocalModel(file: string) {
 		const walkKey = Object.keys(actions).find(n => /walk/i.test(n));
 		const jumpKey = Object.keys(actions).find(n => /jump/i.test(n));
 		const idleKeys = Object.keys(actions).filter(n => /idle/i.test(n));
+		const reservedKeys = new Set([walkKey, jumpKey, ...idleKeys].filter(Boolean));
+		const attackKey = Object.keys(actions).find(n => /attack|bite|hit|punch|swipe|scratch|strike|claw|snap|headbutt/i.test(n))
+			?? Object.keys(actions).find(n => !reservedKeys.has(n));
 
 		if (walkKey) {
 			actions._walk = actions[walkKey];
@@ -107,6 +114,15 @@ function loadLocalModel(file: string) {
 
 		if (jumpKey) {
 			actions._jump = actions[jumpKey];
+		}
+
+		if (attackKey) {
+			actions._attack = actions[attackKey];
+			actions._attack.setLoop(THREE.LoopOnce, 1);
+			actions._attack.clampWhenFinished = true;
+			console.log('Attack animation mapped to:', attackKey);
+		} else {
+			console.warn('No attack animation found in clips:', Object.keys(actions));
 		}
 
 		idleActions = idleKeys.map(k => actions[k]);
@@ -166,6 +182,9 @@ function addRemotePlayer(data: RemotePlayerData) {
 		const walkKey = Object.keys(remote.actions).find(n => /walk/i.test(n));
 		const jumpKey = Object.keys(remote.actions).find(n => /jump/i.test(n));
 		const idleKeys = Object.keys(remote.actions).filter(n => /idle/i.test(n));
+		const rReserved = new Set([walkKey, jumpKey, ...idleKeys].filter(Boolean));
+		const attackKey = Object.keys(remote.actions).find(n => /attack|bite|hit|punch|swipe|scratch|strike|claw|snap|headbutt/i.test(n))
+			?? Object.keys(remote.actions).find(n => !rReserved.has(n));
 
 		if (walkKey) {
 			remote.actions._walk = remote.actions[walkKey];
@@ -173,6 +192,12 @@ function addRemotePlayer(data: RemotePlayerData) {
 
 		if (jumpKey) {
 			remote.actions._jump = remote.actions[jumpKey];
+		}
+
+		if (attackKey) {
+			remote.actions._attack = remote.actions[attackKey];
+			remote.actions._attack.setLoop(THREE.LoopOnce, 1);
+			remote.actions._attack.clampWhenFinished = true;
 		}
 
 		if (idleKeys.length > 0) {
@@ -220,6 +245,8 @@ function updateRemotePlayer(data: RemotePlayerData) {
 		let nextAction: THREE.AnimationAction | undefined;
 		if (data.animation === 'jump' && remote.actions._jump) {
 			nextAction = remote.actions._jump;
+		} else if (data.animation === 'attack' && remote.actions._attack) {
+			nextAction = remote.actions._attack;
 		} else if (data.animation === 'walk' && remote.actions._walk) {
 			nextAction = remote.actions._walk;
 		} else {
@@ -270,14 +297,39 @@ connect({
 		removeRemotePlayer(id);
 		console.log(`Player left: ${id}`);
 	},
+	onPlayerAttacked(data) {
+		// Show attack animation on remote player
+		const remote = remotePlayers.get(data.id);
+		if (remote?.mixer && remote.actions._attack) {
+			if (remote.currentAction) {
+				remote.currentAction.fadeOut(0.15);
+			}
+
+			remote.actions._attack.reset().fadeIn(0.15).play();
+			remote.currentAction = remote.actions._attack;
+		}
+	},
+	onKnockback(data) {
+		// Server says we got hit snap to the knockback position
+		player.position.x = data.x;
+		player.position.z = data.z;
+	},
 });
 
 const keys: Record<string, boolean> = {};
 globalThis.addEventListener('keydown', event => {
 	keys[event.code] = true;
+	// Also map by event.key for Enter (covers NumpadEnter, etc.)
+	// Fuck chrome this is stupid why is there so many standards
+	if (event.key === 'Enter') {
+		keys.Enter = true;
+	}
 });
 globalThis.addEventListener('keyup', event => {
 	keys[event.code] = false;
+	if (event.key === 'Enter') {
+		keys.Enter = false;
+	}
 });
 
 window.addEventListener('resize', () => {
@@ -330,6 +382,36 @@ function animate() {
 		onGround = false;
 	}
 
+	// Attack on Enter
+	if (attackTimer > 0) {
+		attackTimer -= dt;
+		if (attackTimer <= 0) {
+			isAttacking = false;
+		}
+	}
+
+	if (keys.Enter && !isAttacking) {
+		isAttacking = true;
+		attackTimer = attackCooldown;
+		currentAnimName = 'attack';
+
+		if (mixer && actions._attack) {
+			// Stop all current animations and play attack
+			mixer.stopAllAction();
+			actions._attack.reset();
+			actions._attack.setEffectiveWeight(1);
+			actions._attack.setEffectiveTimeScale(1);
+			actions._attack.play();
+			currentAction = actions._attack;
+		}
+
+		sendAttack({
+			x: player.position.x,
+			z: player.position.z,
+			rotationY: player.rotation.y,
+		});
+	}
+
 	velocity.y += gravity * dt;
 	player.position.y += velocity.y * dt;
 
@@ -363,16 +445,20 @@ function animate() {
 	player.position.z = Math.max(-halfBound, Math.min(halfBound, player.position.z));
 
 	if (mixer) {
-		if (!onGround) {
+		if (isAttacking) {
+			// Keep playing attack animation
+		} else if (!onGround) {
 			if (actions._jump && (wasOnGround || currentAction !== actions._jump)) {
 				fadeToAction(actions._jump);
 				currentAnimName = 'jump';
 			}
 		} else if (isMoving) {
-			if (actions._walk && (!wasMoving || !wasOnGround)) {
+			if (actions._walk && (currentAction !== actions._walk)) {
 				fadeToAction(actions._walk);
 				currentAnimName = 'walk';
 			}
+		} else if (currentAction !== undefined && !idleActions.includes(currentAction)) {
+			pickRandomIdle();
 		} else if (wasMoving || !wasOnGround) {
 			pickRandomIdle();
 		}

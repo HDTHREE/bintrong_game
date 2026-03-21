@@ -17,11 +17,20 @@ export type InitPayload = {
 	players: Record<string, RemotePlayerData>;
 };
 
+export type AttackData = {
+	id: string;
+	x: number;
+	z: number;
+	rotationY: number;
+};
+
 export type NetworkCallbacks = {
 	onInit: (payload: InitPayload) => void;
 	onPlayerJoined: (player: RemotePlayerData) => void;
 	onPlayerMoved: (player: RemotePlayerData) => void;
 	onPlayerLeft: (id: string) => void;
+	onPlayerAttacked: (data: AttackData) => void;
+	onKnockback: (data: {x: number; z: number}) => void;
 };
 
 let socket: Socket | undefined;
@@ -45,6 +54,14 @@ export function connect(callbacks: NetworkCallbacks) {
 	socket.on('playerLeft', (id: string) => {
 		callbacks.onPlayerLeft(id);
 	});
+
+	socket.on('playerAttacked', (data: AttackData) => {
+		callbacks.onPlayerAttacked(data);
+	});
+
+	socket.on('knockback', (data: {x: number; z: number}) => {
+		callbacks.onKnockback(data);
+	});
 }
 
 export function sendUpdate(data: {
@@ -56,4 +73,8 @@ export function sendUpdate(data: {
 	animation: string;
 }) {
 	socket?.emit('playerUpdate', data);
+}
+
+export function sendAttack(data: {x: number; z: number; rotationY: number}) {
+	socket?.emit('attack', data);
 }
