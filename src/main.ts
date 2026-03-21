@@ -52,6 +52,10 @@ const attackCooldown = 0.6;
 let attackTimer = 0;
 let isAttacking = false;
 
+const stunDuration = 0.1;
+let stunTimer = 0;
+let isStunned = false;
+
 let localModelFile = 'Colobus_Animations.glb';
 
 function fadeToAction(next: THREE.AnimationAction, duration = 0.2) {
@@ -123,6 +127,14 @@ function loadLocalModel(file: string) {
 			console.log('Attack animation mapped to:', attackKey);
 		} else {
 			console.warn('No attack animation found in clips:', Object.keys(actions));
+		}
+
+		const hitKey = Object.keys(actions).find(n => /hurt|damage|pain|flinch|stagger|react|gethit|hit/i.test(n))
+			?? attackKey;
+		if (hitKey) {
+			actions._hit = actions[hitKey];
+			actions._hit.setLoop(THREE.LoopOnce, 1);
+			actions._hit.clampWhenFinished = true;
 		}
 
 		idleActions = idleKeys.map(k => actions[k]);
@@ -200,6 +212,14 @@ function addRemotePlayer(data: RemotePlayerData) {
 			remote.actions._attack.clampWhenFinished = true;
 		}
 
+		const rHitKey = Object.keys(remote.actions).find(n => /hurt|damage|pain|flinch|stagger|react|gethit|hit/i.test(n))
+			?? attackKey;
+		if (rHitKey) {
+			remote.actions._hit = remote.actions[rHitKey];
+			remote.actions._hit.setLoop(THREE.LoopOnce, 1);
+			remote.actions._hit.clampWhenFinished = true;
+		}
+
 		if (idleKeys.length > 0) {
 			const firstIdle = remote.actions[idleKeys[0]];
 			firstIdle.play();
@@ -247,6 +267,8 @@ function updateRemotePlayer(data: RemotePlayerData) {
 			nextAction = remote.actions._jump;
 		} else if (data.animation === 'attack' && remote.actions._attack) {
 			nextAction = remote.actions._attack;
+		} else if (data.animation === 'hit' && remote.actions._hit) {
+			nextAction = remote.actions._hit;
 		} else if (data.animation === 'walk' && remote.actions._walk) {
 			nextAction = remote.actions._walk;
 		} else {
@@ -310,9 +332,25 @@ connect({
 		}
 	},
 	onKnockback(data) {
-		// Server says we got hit snap to the knockback position
+		// Server says we got hit — snap to knockback position and apply stun
 		player.position.x = data.x;
 		player.position.z = data.z;
+
+		isStunned = true;
+		stunTimer = stunDuration;
+		isAttacking = false;
+		attackTimer = 0;
+
+		// Play hit animation once
+		if (mixer && actions._hit) {
+			mixer.stopAllAction();
+			actions._hit.reset();
+			actions._hit.setEffectiveWeight(1);
+			actions._hit.setEffectiveTimeScale(1);
+			actions._hit.play();
+			currentAction = actions._hit;
+			currentAnimName = 'hit';
+		}
 	},
 });
 
@@ -348,20 +386,28 @@ function animate() {
 	requestAnimationFrame(animate);
 	const dt = Math.min(clock.getDelta(), 0.05);
 
+	// Tick stun timer
+	if (stunTimer > 0) {
+		stunTimer -= dt;
+		if (stunTimer <= 0) {
+			isStunned = false;
+		}
+	}
+
 	const dir = new THREE.Vector3();
-	if (keys.KeyW) {
+	if (!isStunned && keys.KeyW) {
 		dir.z -= 1;
 	}
 
-	if (keys.KeyS) {
+	if (!isStunned && keys.KeyS) {
 		dir.z += 1;
 	}
 
-	if (keys.KeyA) {
+	if (!isStunned && keys.KeyA) {
 		dir.x -= 1;
 	}
 
-	if (keys.KeyD) {
+	if (!isStunned && keys.KeyD) {
 		dir.x += 1;
 	}
 
@@ -377,7 +423,7 @@ function animate() {
 		player.rotation.y = Math.atan2(dir.x, dir.z);
 	}
 
-	if (keys.Space && onGround) {
+	if (!isStunned && keys.Space && onGround) {
 		velocity.y = jumpSpeed;
 		onGround = false;
 	}
@@ -390,7 +436,7 @@ function animate() {
 		}
 	}
 
-	if (keys.Enter && !isAttacking) {
+	if (keys.Enter && !isAttacking && !isStunned) {
 		isAttacking = true;
 		attackTimer = attackCooldown;
 		currentAnimName = 'attack';
@@ -445,7 +491,9 @@ function animate() {
 	player.position.z = Math.max(-halfBound, Math.min(halfBound, player.position.z));
 
 	if (mixer) {
-		if (isAttacking) {
+		if (isStunned) {
+			// Keep playing hit animation during stun
+		} else if (isAttacking) {
 			// Keep playing attack animation
 		} else if (!onGround) {
 			if (actions._jump && (wasOnGround || currentAction !== actions._jump)) {
