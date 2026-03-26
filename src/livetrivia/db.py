@@ -5,12 +5,11 @@ import typing_extensions as tp
 import sqlalchemy.ext.asyncio as sqlas
 import sqlalchemy.orm as sqlorm
 from livetrivia.utils import getenvs
-from livetrivia.models.anki_deck import create_anki_tables
 from fastapi import Depends
 import logging
 
 if tp.TYPE_CHECKING:
-    from fastapi import Depends, FastAPI
+    from fastapi import FastAPI
     import types_aiobotocore_s3 as aiob3t
 
 
@@ -30,12 +29,6 @@ async def get_sql_engine(
         yield engine
 
 
-async def new_inmemory_sql_engine() -> tp.AsyncGenerator[sqlas.AsyncEngine]:
-    """Dependency async generator that yields an async SQLAlchemy engine (in-memory SQLite). Anki use case (i.e. tables are created)."""
-    async for engine in _get_sql_engine("sqlite+aiosqlite:///:memory:"):
-        yield engine
-
-
 async def _get_sql_engine(url: str) -> tp.AsyncGenerator[sqlas.AsyncEngine]:
     """Creates and yields an async SQLAlchemy engine. Common function for other engine dependencies."""
     yield sqlas.create_async_engine(url)
@@ -52,26 +45,9 @@ async def get_sql_session(
         yield session
 
 
-async def new_inmemory_anki_orm(
-    async_engine: sqlas.AsyncEngine = Depends(new_inmemory_sql_engine),
-) -> tp.AsyncGenerator[sqlas.AsyncSession]:
-    """SQLAlchemy Async Session dependency async generator for Anki ORM. Since this database is re-created each time, tables are set each time as well."""
-    # Create Anki tables (legacy tables ONLY — Anki itself will upgrade the schema on import).
-    async with async_engine.begin() as connection:
-        await connection.run_sync(create_anki_tables)
-
-    # Create and yield the session.
-    async_session = sqlorm.sessionmaker(
-        bind=async_engine, class_=sqlas.AsyncSession, expire_on_commit=False
-    )
-    session: sqlas.AsyncSession
-    async with async_session() as session:
-        yield session
-
-
 async def get_s3_session() -> tp.AsyncGenerator[aioboto3.Session]:
     """Aioboto3 Session dependency async generator."""
-    yield aioboto3.Session()  # TODO prob add stuff here
+    yield aioboto3.Session()
 
 
 async def get_s3_client(
@@ -125,8 +101,3 @@ SqlSession: tp.TypeAlias = tp.Annotated[sqlas.AsyncSession, Depends(get_sql_sess
 S3Client: tp.TypeAlias = tp.Annotated["aiob3t.S3Client", Depends(get_s3_client)]
 """Aioboto3 S3 Client dependency type alias. Provides an injected dependency for S3 operations."""
 
-
-AnkiOrmSession: tp.TypeAlias = tp.Annotated[
-    sqlas.AsyncSession, Depends(new_inmemory_anki_orm)
-]
-"""SQLAlchemy Async Session dependency type alias. Functionally equivalent to `SqlSession` but in-memory SQLite database and uses Anki tables pre-created."""

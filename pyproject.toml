@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "aiohttp>=3.13.3",
+    "genanki>=0.13.1",
     "lazy-loader>=0.4",
     "python-dotenv>=1.2.1",
     "sqlmodel>=0.0.27",
@@ -26,6 +27,7 @@ backend = [
     "aioboto3>=15.5.0",
     "types-aioboto3[essential]>=15.5.0",
     "python-docx>=1.2.0",
+    "genanki>=0.13.1",
 ]
 frontend = [
     "dash-ag-grid>=32.3.2",

@@ -8,12 +8,12 @@
     "start": "node dist-server/server.js",
     "lint": "xo --fix && uvx ruff check && uvx ruff format",
     "install:venv": "uv sync --all-extras",
-    "install:mistral": "mkdir -p models/mistral-7b && uvx --from huggingface_hub hf download mistralai/Mistral-7B-Instruct-v0.3 --local-dir ./models/mistral-7b",
-    "docker:s3": "docker run --name localstack -p 4566:4566 -e SERVICES=s3 -e DEFAULT_REGION=us-east-1 -e DEBUG=1 localstack/localstack:latest",
-    "docker:sgl": "docker run -itd -p 30000:30000 --shm-size 32g --gpus all -v $(pwd)/models/mistral-7b:/local/mistral-7b:ro --ipc=host --privileged --name sglang lmsysorg/sglang:dev python -m sglang.launch_server --model /local/mistral-7b --context-length 32000 --tp 1 --quantization fp8 --kv-cache-dtype fp8_e5m2 --attention-backend triton --chunked-prefill-size 4096 --mem-fraction-static 0.8 --enable-torch-compile --host 0.0.0.0 --port 30000",
+    "install:mistral": "node -e \"require('fs').mkdirSync('models/mistral-7b', { recursive: true })\" && uvx --from huggingface_hub hf download mistralai/Mistral-7B-Instruct-v0.3 --local-dir ./models/mistral-7b",
+    "docker:s3": "node ./scripts/docker-s3.js",
+    "docker:sgl": "node ./scripts/docker-sgl.js",
     "dev:sgl": "python -m sglang.launch_server --model /models/mistral-7b --context-length 32000 --tp 1 --quantization fp8 --kv-cache-dtype fp8_e5m2 --attention-backend triton --chunked-prefill-size 4096 --mem-fraction-static 0.8 --enable-torch-compile --host 0.0.0.0 --port 30000",
-    "dev:api": "./src/livetrivia/_api.py",
-    "dev:app": "./src/livetrivia/_app.py"
+    "dev:api": "uv run -- python -m uvicorn livetrivia._api:api --app-dir src --reload --reload-dir src/livetrivia",
+    "dev:app": "uv run -- python ./src/livetrivia/_app.py"
   },
   "author": "HDTHREE",
   "dependencies": {
