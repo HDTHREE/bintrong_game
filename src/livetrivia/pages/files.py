@@ -123,10 +123,10 @@ async def update_files_grid(_: dict, token: dict):
     if not token or not token.get("access_token"):
         return []
     access_token = token["access_token"]
-    params = {"access_token": access_token}
+    headers = {"Authorization": f"Bearer {access_token}"}
     async with (
         aiohttp.ClientSession(BACKEND_URL) as session,
-        session.get("api/files/data/", params=params) as resp,
+        session.get("api/files/data/", headers=headers) as resp,
     ):
         if resp.status != 200:
             return []
@@ -159,15 +159,15 @@ async def handle_file_action(
     except KeyError as e:
         raise de.PreventUpdate() from e
 
-    params: dict = {"access_token": access_token}
+    headers: dict = {"Authorization": f"Bearer {access_token}"}
     download_data: dash.NoUpdate | dict = dash.no_update
     async with aiohttp.ClientSession(BACKEND_URL) as session:
         if action.lower() == "delete":
-            async with session.delete(f"api/files/{file_id}", params=params) as resp:
+            async with session.delete(f"api/files/{file_id}", headers=headers) as resp:
                 if resp.status != 204:
                     raise de.PreventUpdate()
         elif action.lower() == "download":
-            async with session.get(f"api/files/{file_id}", params=params) as resp:
+            async with session.get(f"api/files/{file_id}", headers=headers) as resp:
                 if resp.status != 200:
                     raise de.PreventUpdate()
                 content: bytes = await resp.read()
@@ -182,7 +182,7 @@ async def handle_file_action(
                 download_data = dash.dcc.send_bytes(content, filename=filename)
         else:
             raise de.PreventUpdate()
-        async with session.get("api/files/data/", params=params) as resp:
+        async with session.get("api/files/data/", headers=headers) as resp:
             if resp.status != 200:
                 raise de.PreventUpdate()
             data: dict = await resp.json()
@@ -203,7 +203,7 @@ async def upload_file(contents: str, filename: str, token: dict):
     _, b64data = contents.split(",", 1)
     file_bytes: bytes = base64.b64decode(b64data)
     access_token: str = token["access_token"]
-    params = {"access_token": access_token}
+    headers = {"Authorization": f"Bearer {access_token}"}
     async with aiohttp.ClientSession(BACKEND_URL) as session:
         data: aiohttp.FormData = aiohttp.FormData(
             fields={
@@ -213,10 +213,10 @@ async def upload_file(contents: str, filename: str, token: dict):
                 "content_type": "application/octet-stream",
             }
         )
-        async with session.post("api/files/", data=data, params=params) as resp:
+        async with session.post("api/files/", data=data, headers=headers) as resp:
             if resp.status != 201:
                 raise de.PreventUpdate()
-        async with session.get("api/files/data/", params=params) as resp:
+        async with session.get("api/files/data/", headers=headers) as resp:
             if resp.status != 200:
                 raise de.PreventUpdate()
             return await resp.json()

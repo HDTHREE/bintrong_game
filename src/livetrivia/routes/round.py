@@ -10,6 +10,7 @@ from livetrivia.models.game import Game
 from livetrivia.models.session import Session
 from livetrivia.models.status import Status
 from livetrivia.jwt_utils import verify_token
+from livetrivia.routes.session import BearerCredentials
 
 router: APIRouter = APIRouter(prefix="/rounds", tags=["rounds"])
 
@@ -31,9 +32,10 @@ class RoundResponse(BaseModel):
 )
 async def create_round(
     game_id: uuid.UUID,
-    access_token: str,
     sql: SqlSession,
+    credentials: BearerCredentials,
 ) -> Round:
+    access_token = credentials.credentials
     user_id = verify_token(access_token, token_type="access")
     if not user_id:
         raise HTTPException(
@@ -87,9 +89,10 @@ async def create_round(
 )
 async def start_round(
     round_id: uuid.UUID,
-    access_token: str,
     sql: SqlSession,
+    credentials: BearerCredentials,
 ) -> Round:
+    access_token = credentials.credentials
     user_id = verify_token(access_token, token_type="access")
     if not user_id:
         raise HTTPException(
@@ -153,9 +156,10 @@ async def start_round(
 )
 async def end_round(
     round_id: uuid.UUID,
-    access_token: str,
     sql: SqlSession,
+    credentials: BearerCredentials,
 ) -> Round:
+    access_token = credentials.credentials
     user_id = verify_token(access_token, token_type="access")
     if not user_id:
         raise HTTPException(

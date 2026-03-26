@@ -56,13 +56,14 @@ async def on_signout(n_clicks: int | None, token: dict):
     # This will fire on page load (regardless of the value of prevent_initial_call) so check if `None` for first trigger.
     if n_clicks is None or not token or not token.get("access_token"):
         raise de.PreventUpdate()
-    params: dict = {"access_token": token["access_token"]}
+    access_token = token["access_token"]
+    headers: dict = {"Authorization": f"Bearer {access_token}"}
     async with (
         aiohttp.ClientSession(BACKEND_URL) as session,
-        session.post(url="api/sessions/logout", params=params) as logout_response,
+        session.post(url="api/sessions/logout", headers=headers) as logout_response,
     ):
         async with session.delete(
-            url="api/sessions/", params=params
+            url="api/sessions/", headers=headers
         ) as delete_session_response:
             await logout_response.json()
             await delete_session_response.json()

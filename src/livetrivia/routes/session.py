@@ -1,5 +1,6 @@
 import typing_extensions as tp
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlmodel import select
 from pydantic import BaseModel
 from datetime import datetime
@@ -17,6 +18,9 @@ from livetrivia.jwt_utils import (
 )
 
 router: APIRouter = APIRouter(prefix="/sessions", tags=["sessions"])
+
+
+BearerCredentials: tp.TypeAlias = tp.Annotated[HTTPAuthorizationCredentials, Depends(HTTPBearer())]
 
 
 class SessionResponse(BaseModel):
@@ -133,10 +137,11 @@ async def login(
 
 @router.post("/refresh", response_model=TokenResponse, status_code=status.HTTP_200_OK)
 async def refresh_access_token(
-    refresh_token: str,
+    credentials: BearerCredentials,
     sql: SqlSession,
 ) -> TokenResponse:
     """Refresh the access token using a valid refresh token."""
+    refresh_token = credentials.credentials
     user_id = verify_token(refresh_token, token_type="refresh")
     if not user_id:
         raise HTTPException(
@@ -182,10 +187,11 @@ async def refresh_access_token(
 
 @router.post("/logout", status_code=status.HTTP_200_OK)
 async def logout(
-    access_token: str,
+    credentials: BearerCredentials,
     sql: SqlSession,
 ) -> dict:
     """Disables a session. Sets flag to false."""
+    access_token = credentials.credentials
     user_id = verify_token(access_token, token_type="access", strict=False)
     if not user_id:
         raise HTTPException(
@@ -214,10 +220,11 @@ async def logout(
 
 @router.get("/", response_model=SessionResponse, status_code=status.HTTP_200_OK)
 async def get_current_session(
-    access_token: str,
+    credentials: BearerCredentials,
     sql: SqlSession,
 ) -> Session:
     """Get current session information."""
+    access_token = credentials.credentials
     user_id = verify_token(access_token, token_type="access")
     if not user_id:
         raise HTTPException(
@@ -244,10 +251,11 @@ async def get_current_session(
 
 @router.delete("/", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_session(
-    access_token: str,
+    credentials: BearerCredentials,
     sql: SqlSession,
 ) -> None:
     """Delete a session record."""
+    access_token = credentials.credentials
     user_id = verify_token(access_token, token_type="access", strict=False)
     if not user_id:
         raise HTTPException(
@@ -271,8 +279,9 @@ async def delete_session(
     await sql.commit()
 
 
-async def get_current_user(access_token: str) -> uuid.UUID:
+async def get_current_user(credentials: BearerCredentials) -> uuid.UUID:
     """Verify access token and return user_id."""
+    access_token = credentials.credentials
     user_id: uuid.UUID | None = verify_token(
         access_token, token_type="access", strict=False
     )

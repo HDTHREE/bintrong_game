@@ -9,6 +9,7 @@ from livetrivia.models.game import Game, GamePlayer
 from livetrivia.models.session import Session
 from livetrivia.models.status import Status
 from livetrivia.jwt_utils import verify_token
+from livetrivia.routes.session import BearerCredentials
 
 router: APIRouter = APIRouter(prefix="/games", tags=["games"])
 
@@ -40,9 +41,10 @@ class GamePlayerResponse(BaseModel):
 
 @router.post("/", response_model=GameResponse, status_code=status.HTTP_201_CREATED)
 async def create_game(
-    access_token: str,
     sql: SqlSession,
+    credentials: BearerCredentials,
 ) -> Game:
+    access_token = credentials.credentials
     user_id = verify_token(access_token, token_type="access")
     if not user_id:
         raise HTTPException(
@@ -75,9 +77,10 @@ async def create_game(
 )
 async def join_game(
     game_code: str,
-    access_token: str,
     sql: SqlSession,
+    credentials: BearerCredentials,
 ) -> GamePlayer:
+    access_token = credentials.credentials
     user_id = verify_token(access_token, token_type="access")
     if not user_id:
         raise HTTPException(
@@ -133,9 +136,10 @@ async def join_game(
 )
 async def start_game(
     game_id: uuid.UUID,
-    access_token: str,
     sql: SqlSession,
+    credentials: BearerCredentials,
 ) -> Game:
+    access_token = credentials.credentials
     user_id = verify_token(access_token, token_type="access")
     if not user_id:
         raise HTTPException(
@@ -192,9 +196,10 @@ async def start_game(
 )
 async def end_game(
     game_id: uuid.UUID,
-    access_token: str,
     sql: SqlSession,
+    credentials: BearerCredentials,
 ) -> Game:
+    access_token = credentials.credentials
     user_id = verify_token(access_token, token_type="access")
     if not user_id:
         raise HTTPException(
@@ -254,9 +259,10 @@ async def end_game(
 async def increment_player_score(
     game_id: uuid.UUID,
     player_id: uuid.UUID,
-    access_token: str,
     sql: SqlSession,
+    credentials: BearerCredentials,
 ) -> GamePlayer:
+    access_token = credentials.credentials
     user_id = verify_token(access_token, token_type="access")
     if not user_id:
         raise HTTPException(
