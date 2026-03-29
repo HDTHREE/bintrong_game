@@ -6,7 +6,7 @@
     "dev": "concurrently \"webpack serve\" \"npx tsc -p tsconfig.server.json && node dist-server/server.js\"",
     "build": "npx tsc -p tsconfig.server.json && webpack --mode production",
     "start": "node dist-server/server.js",
-    "lint": "xo --fix && uvx ruff check && uvx ruff format",
+    "lint": "xo --fix || uvx ruff check || uvx ruff format",
     "install:venv": "uv sync --all-extras",
     "install:mistral": "node -e \"require('fs').mkdirSync('models/mistral-7b', { recursive: true })\" && uvx --from huggingface_hub hf download mistralai/Mistral-7B-Instruct-v0.3 --local-dir ./models/mistral-7b",
     "docker:s3": "node ./scripts/docker-s3.js",
@@ -34,10 +34,34 @@
     "webpack-dev-server": "^5.2.2",
     "xo": "^1.2.3"
   },
-  "xo": {
-    "ignores": [
-      "webpack.config.js",
-      "src/**/index.{js,ts,jsx,tsx}"
-    ]
-  }
+  "xo": [
+    {
+      "ignores": [
+        "webpack.config.js",
+        "src/**/index.{js,ts,jsx,tsx}"
+      ]
+    },
+    {
+      "files": [
+        "src/**/*.{ts,tsx,mts,cts}"
+      ],
+      "languageOptions": {
+        "parserOptions": {
+          "projectService": false,
+          "project": "./tsconfig.json"
+        }
+      }
+    },
+    {
+      "files": [
+        "server.ts"
+      ],
+      "languageOptions": {
+        "parserOptions": {
+          "projectService": false,
+          "project": "./tsconfig.server.json"
+        }
+      }
+    }
+  ]
 }

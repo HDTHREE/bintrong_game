@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js';
-import {connect, sendUpdate, sendAttack, type RemotePlayerData} from './network';
+import {
+	connect, sendUpdate, sendAttack, type RemotePlayerData,
+} from './network';
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x11_11_11);

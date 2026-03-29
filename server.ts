@@ -1,6 +1,6 @@
-import express from 'express';
 import {createServer} from 'node:http';
 import path from 'node:path';
+import express from 'express';
 import {Server} from 'socket.io';
 
 const app = express();
@@ -136,7 +136,7 @@ io.on('connection', socket => {
 	});
 });
 
-const port: Number = Number(process.env.PORT) || 3000;
+const port: number = Number(process.env.PORT) || 3000;
 httpServer.listen(port, () => {
 	console.log(`Game server listening on http://localhost:${port}`);
 });
