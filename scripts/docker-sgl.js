@@ -2,7 +2,7 @@
 /* eslint unicorn/no-process-exit: "off" */
 import {spawnSync} from 'node:child_process';
 import path from 'node:path';
-import {process} from 'node:process';
+import process from 'node:process';
 
 const modelPath = path.resolve('models', 'mistral-7b').replaceAll('\\', '/');
 

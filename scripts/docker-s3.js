@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* eslint unicorn/no-process-exit: "off" */
 import {spawnSync} from 'node:child_process';
-import {process} from 'node:process';
+import process from 'node:process';
 
 const cleanup = spawnSync('docker', ['rm', '-f', 'localstack'], {stdio: 'inherit'});
 
