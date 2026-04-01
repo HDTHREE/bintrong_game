@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js';
 import {
-	connect, sendUpdate, sendAttack, type RemotePlayerData,
+	connect, sendUpdate, sendAttack, type RemotePlayerData, type RoundState,
 } from './network';
 
 const scene = new THREE.Scene();
@@ -14,6 +14,7 @@ camera.lookAt(0, 0, 0);
 const renderer = new THREE.WebGLRenderer({antialias: true});
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.append(renderer.domElement);
 
 const deadOverlay = document.createElement('div');
@@ -33,9 +34,50 @@ deadOverlay.style.pointerEvents = 'none';
 deadOverlay.style.zIndex = '9999';
 document.body.append(deadOverlay);
 
+const roundHud = document.createElement('div');
+roundHud.style.position = 'fixed';
+roundHud.style.left = '50%';
+roundHud.style.top = '18px';
+roundHud.style.transform = 'translateX(-50%)';
+roundHud.style.padding = '12px 16px';
+roundHud.style.background = 'rgba(0, 0, 0, 0.45)';
+roundHud.style.border = '1px solid rgba(255, 255, 255, 0.2)';
+roundHud.style.borderRadius = '10px';
+roundHud.style.color = '#ffffff';
+roundHud.style.fontFamily = '"Trebuchet MS", Verdana, sans-serif';
+roundHud.style.minWidth = 'min(92vw, 840px)';
+roundHud.style.textAlign = 'center';
+roundHud.style.backdropFilter = 'blur(2px)';
+roundHud.style.pointerEvents = 'none';
+roundHud.style.zIndex = '1000';
+
+const roundTimer = document.createElement('div');
+roundTimer.style.fontSize = '1.1rem';
+roundTimer.style.fontWeight = '700';
+roundTimer.style.letterSpacing = '0.04em';
+roundTimer.textContent = 'Waiting...';
+
+const roundQuestion = document.createElement('div');
+roundQuestion.style.marginTop = '6px';
+roundQuestion.style.fontSize = '1.05rem';
+roundQuestion.style.fontWeight = '600';
+roundQuestion.textContent = 'Waiting for first question';
+
+roundHud.append(roundTimer, roundQuestion);
+document.body.append(roundHud);
+
 const dirLight = new THREE.DirectionalLight(0xFF_FF_FF, 1.2);
 dirLight.position.set(8, 15, 10);
 dirLight.castShadow = true;
+dirLight.shadow.mapSize.set(2048, 2048);
+dirLight.shadow.camera.left = -12;
+dirLight.shadow.camera.right = 12;
+dirLight.shadow.camera.top = 12;
+dirLight.shadow.camera.bottom = -12;
+dirLight.shadow.camera.near = 1;
+dirLight.shadow.camera.far = 40;
+dirLight.shadow.bias = -0.0004;
+dirLight.shadow.normalBias = 0.03;
 scene.add(dirLight);
 scene.add(new THREE.AmbientLight(0x60_60_60));
 
@@ -213,7 +255,194 @@ type RemotePlayer = {
 	dead: boolean;
 };
 
+type ZoneVisual = {
+	shadow: THREE.Mesh;
+	label: THREE.Sprite;
+	labelText: string;
+};
+
 const remotePlayers = new Map<string, RemotePlayer>();
+const zoneVisuals = new Map<number, ZoneVisual>();
+
+function createTextSprite(text: string): THREE.Sprite {
+	const canvas = document.createElement('canvas');
+	canvas.width = 512;
+	canvas.height = 256;
+	const context = canvas.getContext('2d');
+	if (!context) {
+		const fallback = new THREE.Sprite(new THREE.SpriteMaterial({color: 0xFF_FF_FF}));
+		fallback.scale.set(3.2, 1.6, 1);
+		return fallback;
+	}
+
+	context.clearRect(0, 0, canvas.width, canvas.height);
+	context.fillStyle = 'rgba(0, 0, 0, 0.62)';
+	context.fillRect(6, 16, canvas.width - 12, canvas.height - 32);
+	context.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+	context.lineWidth = 3;
+	context.strokeRect(6, 16, canvas.width - 12, canvas.height - 32);
+	context.fillStyle = '#ffffff';
+	context.font = '700 30px Trebuchet MS';
+	context.textAlign = 'center';
+	context.textBaseline = 'top';
+
+	const maxTextWidth = canvas.width - 34;
+	const words = text.split(/\s+/).filter(Boolean);
+	const lines: string[] = [];
+	let currentLine = '';
+	for (const word of words) {
+		const trial = currentLine ? `${currentLine} ${word}` : word;
+		if (context.measureText(trial).width <= maxTextWidth) {
+			currentLine = trial;
+			continue;
+		}
+
+		if (currentLine) {
+			lines.push(currentLine);
+		}
+
+		currentLine = word;
+	}
+
+	if (currentLine) {
+		lines.push(currentLine);
+	}
+
+	const maxLines = 5;
+	const visibleLines = lines.slice(0, maxLines);
+	if (lines.length > maxLines) {
+		visibleLines[maxLines - 1] = `${visibleLines[maxLines - 1]}...`;
+	}
+
+	const lineHeight = 38;
+	const contentHeight = visibleLines.length * lineHeight;
+	let y = Math.max(28, (canvas.height - contentHeight) / 2);
+	for (const line of visibleLines) {
+		context.fillText(line, canvas.width / 2, y);
+		y += lineHeight;
+	}
+
+	const texture = new THREE.CanvasTexture(canvas);
+	texture.needsUpdate = true;
+	const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+		map: texture,
+		transparent: true,
+		depthTest: false,
+		depthWrite: false,
+	}));
+	sprite.scale.set(4.2, 2.1, 1);
+	return sprite;
+}
+
+function clearZoneVisuals() {
+	for (const visual of zoneVisuals.values()) {
+		scene.remove(visual.shadow);
+		scene.remove(visual.label);
+		visual.shadow.geometry.dispose();
+		(visual.shadow.material as THREE.Material).dispose();
+		const {material} = visual.label;
+		material.map?.dispose();
+		material.dispose();
+	}
+
+	zoneVisuals.clear();
+}
+
+function updateZoneVisuals(roundState: RoundState) {
+	if (roundState.phase !== 'question') {
+		clearZoneVisuals();
+		return;
+	}
+
+	const liveZoneIds = new Set<number>();
+	for (const zone of roundState.zones) {
+		liveZoneIds.add(zone.id);
+		let visual = zoneVisuals.get(zone.id);
+		if (!visual) {
+			const shadow = new THREE.Mesh(
+				new THREE.CircleGeometry(1, 32),
+				new THREE.MeshBasicMaterial({
+					color: 0x00_00_00,
+					transparent: true,
+					opacity: 0.32,
+				}),
+			);
+			shadow.rotation.x = -Math.PI / 2;
+			shadow.position.y = 0.005;
+			shadow.visible = zone.revealed;
+
+			const label = createTextSprite(zone.answer);
+			label.position.y = 1.25;
+			label.visible = zone.revealed;
+
+			scene.add(shadow);
+			scene.add(label);
+			visual = {
+				shadow,
+				label,
+				labelText: zone.answer,
+			};
+			zoneVisuals.set(zone.id, visual);
+		}
+
+		visual.shadow.position.set(zone.x, 0.005, zone.z);
+		visual.shadow.scale.set(zone.radius, zone.radius, 1);
+		visual.shadow.visible = zone.revealed;
+		visual.label.position.set(zone.x, 1.25, zone.z);
+
+		if (zone.answer !== visual.labelText) {
+			const {material} = visual.label;
+			material.map?.dispose();
+			material.dispose();
+			scene.remove(visual.label);
+			visual.label = createTextSprite(zone.answer);
+			visual.label.position.set(zone.x, 1.25, zone.z);
+			visual.label.visible = zone.revealed;
+			scene.add(visual.label);
+			visual.labelText = zone.answer;
+		}
+
+		visual.label.visible = zone.revealed;
+		if (zone.revealed) {
+			const revealRank = roundState.zones
+				.filter(candidate => candidate.revealed)
+				.findIndex(candidate => candidate.id === zone.id);
+			visual.label.renderOrder = 100 + revealRank;
+			visual.shadow.renderOrder = 50 + revealRank;
+		}
+	}
+
+	for (const [id, visual] of zoneVisuals) {
+		if (liveZoneIds.has(id)) {
+			continue;
+		}
+
+		scene.remove(visual.shadow);
+		scene.remove(visual.label);
+		visual.shadow.geometry.dispose();
+		(visual.shadow.material as THREE.Material).dispose();
+		const {material} = visual.label;
+		material.map?.dispose();
+		material.dispose();
+		zoneVisuals.delete(id);
+	}
+}
+
+function applyRoundState(roundState: RoundState) {
+	const secondsLeft = Math.ceil(roundState.timeLeftMs / 1000);
+	if (roundState.phase === 'question') {
+		roundTimer.textContent = `Round ${roundState.round} | ${secondsLeft}s`;
+		roundQuestion.textContent = roundState.question;
+	} else if (roundState.phase === 'break') {
+		roundTimer.textContent = `Break | ${secondsLeft}s`;
+		roundQuestion.textContent = 'Next question incoming...';
+	} else {
+		roundTimer.textContent = 'Waiting';
+		roundQuestion.textContent = roundState.question || 'Waiting for players';
+	}
+
+	updateZoneVisuals(roundState);
+}
 
 function loadRemoteModel(remote: RemotePlayer, modelFile: string) {
 	remote.modelFile = modelFile;
@@ -379,6 +608,9 @@ connect({
 		socketId = payload.id;
 		localModelFile = payload.modelFile;
 		loadLocalModel(localModelFile);
+		if (payload.roundState) {
+			applyRoundState(payload.roundState);
+		}
 
 		// Apply server-assigned spawn position
 		const me = payload.players[payload.id];
@@ -452,6 +684,9 @@ connect({
 			currentAction = actions._hit;
 			currentAnimName = 'hit';
 		}
+	},
+	onRoundState(state) {
+		applyRoundState(state);
 	},
 });
 

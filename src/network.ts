@@ -17,6 +17,7 @@ export type InitPayload = {
 	id: string;
 	modelFile: string;
 	players: Record<string, RemotePlayerData>;
+	roundState?: RoundState;
 };
 
 export type AttackData = {
@@ -26,6 +27,24 @@ export type AttackData = {
 	rotationY: number;
 };
 
+export type AnswerZoneData = {
+	id: number;
+	x: number;
+	z: number;
+	radius: number;
+	answer: string;
+	revealed: boolean;
+};
+
+export type RoundState = {
+	phase: 'waiting' | 'question' | 'break';
+	round: number;
+	question: string;
+	timeLeftMs: number;
+	revealedAnswerCount: number;
+	zones: AnswerZoneData[];
+};
+
 export type NetworkCallbacks = {
 	onInit: (payload: InitPayload) => void;
 	onPlayerJoined: (player: RemotePlayerData) => void;
@@ -33,6 +52,7 @@ export type NetworkCallbacks = {
 	onPlayerLeft: (id: string) => void;
 	onPlayerAttacked: (data: AttackData) => void;
 	onKnockback: (data: {x: number; z: number}) => void;
+	onRoundState: (state: RoundState) => void;
 };
 
 let socket: Socket | undefined;
@@ -63,6 +83,10 @@ export function connect(callbacks: NetworkCallbacks) {
 
 	socket.on('knockback', (data: {x: number; z: number}) => {
 		callbacks.onKnockback(data);
+	});
+
+	socket.on('roundState', (state: RoundState) => {
+		callbacks.onRoundState(state);
 	});
 }
 
