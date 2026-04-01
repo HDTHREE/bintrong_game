@@ -100,4 +100,3 @@ SqlSession: tp.TypeAlias = tp.Annotated[sqlas.AsyncSession, Depends(get_sql_sess
 
 S3Client: tp.TypeAlias = tp.Annotated["aiob3t.S3Client", Depends(get_s3_client)]
 """Aioboto3 S3 Client dependency type alias. Provides an injected dependency for S3 operations."""
-

@@ -40,7 +40,9 @@ def test_create_user_success(sql_session: MagicMock):
 
 def test_create_user_existing_email(sql_session: MagicMock):
     existing_user = User(email="existing@example.com", password="hashed")
-    sql_session.execute.return_value.scalars.return_value.first.return_value = existing_user
+    sql_session.execute.return_value.scalars.return_value.first.return_value = (
+        existing_user
+    )
 
     user_data = LoginRequest(email="existing@example.com", password="my-password")
 

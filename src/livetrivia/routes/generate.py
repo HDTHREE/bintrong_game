@@ -56,6 +56,7 @@ MIXED_PROMPT: str = (
     + REQUIRED_FIELDS_GUIDANCE
 )
 
+
 class YouTubeBody(BaseModel):
     """Request body for `/api/generate/`. Allows for generation of anki deck based on youtube URL."""
 
@@ -167,9 +168,7 @@ GenApi: tp.TypeAlias = tp.Annotated[aiohttp.ClientSession, Depends(get_gen_api)]
 GenText: tp.TypeAlias = tp.Annotated[str, Depends(get_gen_text)]
 
 
-async def generate_partial(
-    gen: GenApi, prompt: str, chunk: str
-) -> GeneratedFlashcard:
+async def generate_partial(gen: GenApi, prompt: str, chunk: str) -> GeneratedFlashcard:
     json_schema = GeneratedFlashcard.model_json_schema()
 
     last_error: Exception | None = None

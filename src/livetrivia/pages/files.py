@@ -40,7 +40,9 @@ layout: dmc.AppShellMain = dmc.AppShellMain(
                                 children=dmc.Button(
                                     dmc.Text(children="Upload File"),
                                     w="48%",
-                                    leftSection=di.DashIconify(icon="ic:round-file-upload")
+                                    leftSection=di.DashIconify(
+                                        icon="ic:round-file-upload"
+                                    ),
                                 ),
                                 multiple=False,
                                 accept=",".join(EXTS),

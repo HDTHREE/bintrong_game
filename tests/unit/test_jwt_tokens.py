@@ -41,7 +41,9 @@ def test_access_token_rejected_as_refresh() -> None:
     except jwt.MissingRequiredClaimError as error:
         assert "type == refresh" in str(error)
     else:
-        raise AssertionError("Expected MissingRequiredClaimError for token type mismatch")
+        raise AssertionError(
+            "Expected MissingRequiredClaimError for token type mismatch"
+        )
 
 
 def test_refresh_token_rejected_as_access() -> None:
@@ -55,4 +57,6 @@ def test_refresh_token_rejected_as_access() -> None:
     except jwt.MissingRequiredClaimError as error:
         assert "type == access" in str(error)
     else:
-        raise AssertionError("Expected MissingRequiredClaimError for token type mismatch")
+        raise AssertionError(
+            "Expected MissingRequiredClaimError for token type mismatch"
+        )

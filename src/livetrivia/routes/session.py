@@ -20,7 +20,9 @@ from livetrivia.jwt_utils import (
 router: APIRouter = APIRouter(prefix="/sessions", tags=["sessions"])
 
 
-BearerCredentials: tp.TypeAlias = tp.Annotated[HTTPAuthorizationCredentials, Depends(HTTPBearer())]
+BearerCredentials: tp.TypeAlias = tp.Annotated[
+    HTTPAuthorizationCredentials, Depends(HTTPBearer())
+]
 
 
 class SessionResponse(BaseModel):
