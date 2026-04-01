@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Bearcat Debug</title>
+  <style>
+    body { font-family: monospace; background: #111; color: #eee; padding: 1rem; }
+    h1   { color: #f90; margin: 0 0 .25rem; }
+    p    { margin: 0 0 .5rem; color: #aaa; font-size: .85em; }
+    table { border-collapse: collapse; }
+    th, td { border: 1px solid #444; padding: 4px 8px; white-space: nowrap; }
+    th { background: #222; text-align: left; }
+    input[type='text']   { background: #1a1a1a; color: #eee; border: 1px solid #555; padding: 2px 4px; width: 110px; }
+    input[type='number'] { background: #1a1a1a; color: #eee; border: 1px solid #555; padding: 2px 4px; width: 80px; }
+    select { background: #1a1a1a; color: #eee; border: 1px solid #555; padding: 2px 4px; width: 140px; }
+    input[type='checkbox'] { cursor: pointer; }
+    button { background: #0a4; color: #fff; border: none; padding: 3px 12px; cursor: pointer; border-radius: 2px; }
+    button:hover { background: #0c5; }
+    #restart-btn { margin-bottom: .5rem; }
+    .id-cell { color: #888; font-size: .8em; max-width: 130px; overflow: hidden; text-overflow: ellipsis; }
+    #status  { margin-top: .5rem; min-height: 1.2em; color: #0f0; font-size: .85em; }
+  </style>
+</head>
+<body>
+  <h1>Player State Debug</h1>
+  <p>Auto-refreshes every 2&nbsp;s. Editing a row pauses its refresh until you click Apply.</p>
+  <button id="restart-btn" type="button">Restart Game</button>
+  <div id="status"></div>
+  <table>
+    <thead><tr>
+      <th>id</th>
+      <th>x</th><th>y</th><th>z</th>
+      <th>rotationY</th><th>velocityY</th>
+      <th>modelFile</th>
+      <th>dead</th><th>host</th>
+      <th></th>
+    </tr></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+  <script>
+    const FIELDS  = ['x','y','z','rotationY','velocityY','modelFile','dead','host'];
+    const NUMERIC = new Set(['x','y','z','rotationY','velocityY']);
+    const BOOL    = new Set(['dead','host']);
+    const MODEL_OPTIONS = [
+      'Colobus_Animations.glb',
+      'Gecko_Animations.glb',
+      'Herring_Animations.glb',
+      'Inkfish_Animations.glb',
+      'Muskrat_Animations.glb',
+      'Pudu_Animations.glb',
+      'Sparrow_Animations.glb',
+      'Taipan_Animations.glb',
+    ];
+    const dirty   = new Set();
+    const statusEl = document.getElementById('status');
+
+    function makeInput(f, val) {
+      if (BOOL.has(f)) {
+        const cb = document.createElement('input');
+        cb.type = 'checkbox'; cb.checked = !!val; cb.dataset.field = f;
+        return cb;
+      }
+
+      if (f === 'modelFile') {
+        const select = document.createElement('select');
+        const options = MODEL_OPTIONS;
+        for (const optionValue of options) {
+          const option = document.createElement('option');
+          option.value = optionValue;
+          option.textContent = optionValue;
+          select.appendChild(option);
+        }
+        if (!options.includes(String(val))) {
+          const fallback = document.createElement('option');
+          fallback.value = String(val);
+          fallback.textContent = String(val);
+          select.appendChild(fallback);
+        }
+        select.value = String(val);
+        select.dataset.field = f;
+        return select;
+      }
+
+      const inp = document.createElement('input');
+      inp.type = NUMERIC.has(f) ? 'number' : 'text';
+      inp.step = 'any'; inp.value = val; inp.dataset.field = f;
+      return inp;
+    }
+
+    function buildRow(p) {
+      const tr = document.createElement('tr');
+      tr.dataset.id = p.id;
+      const idTd = document.createElement('td');
+      idTd.className = 'id-cell'; idTd.title = p.id; idTd.textContent = p.id;
+      tr.appendChild(idTd);
+      for (const f of FIELDS) {
+        const td  = document.createElement('td');
+        const inp = makeInput(f, p[f]);
+        inp.addEventListener('input',  () => dirty.add(p.id));
+        inp.addEventListener('change', () => dirty.add(p.id));
+        td.appendChild(inp); tr.appendChild(td);
+      }
+      const applyTd = document.createElement('td');
+      const btn     = document.createElement('button');
+      btn.textContent = 'Apply';
+      btn.addEventListener('click', () => applyRow(tr, p.id));
+      applyTd.appendChild(btn); tr.appendChild(applyTd);
+      return tr;
+    }
+
+    function syncRow(tr, p) {
+      if (dirty.has(p.id)) return;
+      for (const inp of tr.querySelectorAll('[data-field]')) {
+        const f = inp.dataset.field;
+        if (BOOL.has(f)) inp.checked = !!p[f]; else inp.value = p[f];
+      }
+    }
+
+    async function applyRow(tr, id) {
+      const body = {};
+      for (const inp of tr.querySelectorAll('[data-field]')) {
+        const f = inp.dataset.field;
+        body[f] = BOOL.has(f) ? inp.checked
+                : NUMERIC.has(f) ? Number(inp.value) : inp.value;
+      }
+      const res = await fetch('/debug/players/' + encodeURIComponent(id), {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        dirty.delete(id);
+        statusEl.textContent = 'Applied to ' + id.slice(0, 8) + '... at ' + new Date().toLocaleTimeString();
+      } else {
+        statusEl.textContent = 'Error ' + res.status + ' for ' + id.slice(0, 8);
+      }
+    }
+
+    async function restartGame() {
+      const res = await fetch('/debug/restart', {method: 'POST'});
+      if (res.ok) {
+        dirty.clear();
+        statusEl.textContent = 'Game restarted at ' + new Date().toLocaleTimeString();
+        await refresh();
+      } else {
+        statusEl.textContent = 'Failed to restart game (' + res.status + ')';
+      }
+    }
+
+    async function refresh() {
+      let players;
+      try {
+        const res = await fetch('/debug/players');
+        if (!res.ok) return;
+        players = await res.json();
+      } catch { return; }
+      const tbody    = document.getElementById('tbody');
+      const incoming = new Map(players.map(p => [p.id, p]));
+      for (const tr of [...tbody.querySelectorAll('tr')]) {
+        if (!incoming.has(tr.dataset.id)) tr.remove();
+      }
+      for (const p of players) {
+        const existing = tbody.querySelector('tr[data-id="' + CSS.escape(p.id) + '"]');
+        if (existing) syncRow(existing, p); else tbody.appendChild(buildRow(p));
+      }
+    }
+
+    document.getElementById('restart-btn').addEventListener('click', () => {
+      void restartGame();
+    });
+
+    refresh();
+    setInterval(refresh, 2000);
+  </script>
+</body>
+</html>
