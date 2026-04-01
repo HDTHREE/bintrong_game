@@ -9,6 +9,8 @@ export type RemotePlayerData = {
 	velocityY: number;
 	animation: string;
 	modelFile: string;
+	dead: boolean;
+	host: boolean;
 };
 
 export type InitPayload = {

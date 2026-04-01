@@ -154,4 +154,4 @@ async def on_refresh(email: str | None, id: str, token: dict, *_: str | int | No
 
 
 if __name__ == "__main__":
-    app.run(port=7777, debug=True)
+    app.run(port=7777)

@@ -12,6 +12,7 @@ const io = new Server(httpServer, {
 });
 
 app.use(express.static(path.join(__dirname, '..', 'dist')));
+app.use(express.json());
 
 type PlayerState = {
 	id: string;
@@ -22,6 +23,8 @@ type PlayerState = {
 	velocityY: number;
 	animation: string;
 	modelFile: string;
+	dead: boolean;
+	host: boolean;
 };
 
 const players = new Map<string, PlayerState>();
@@ -37,13 +40,84 @@ const modelFiles = [
 	'Taipan_Animations.glb',
 ];
 
+const spawnRange = 6;
+
 function pickModel(): string {
 	return modelFiles[Math.floor(Math.random() * modelFiles.length)];
 }
 
+if (process.env.BEARCAT_GAME_DEBUG) {
+	app.get('/debug', (_request, res) => {
+		res.sendFile(path.join(__dirname, '..', 'public', 'debug.html'));
+	});
+
+	app.get('/debug/players', (_request, res) => {
+		res.json([...players.values()]);
+	});
+
+	app.patch('/debug/players/:id', (request, res) => {
+		const p = players.get(request.params.id);
+		if (!p) {
+			res.status(404).json({error: 'Player not found'});
+			return;
+		}
+
+		const numericFields: Array<'x' | 'y' | 'z' | 'rotationY' | 'velocityY'> = ['x', 'y', 'z', 'rotationY', 'velocityY'];
+		const boolFields: Array<'dead' | 'host'> = ['dead', 'host'];
+		const stringFields: Array<'animation' | 'modelFile'> = ['animation', 'modelFile'];
+
+		for (const field of numericFields) {
+			if (field in request.body) {
+				const n = Number(request.body[field]);
+				if (!isFinite(n)) {
+					res.status(400).json({error: `Invalid value for ${field}`});
+					return;
+				}
+
+				p[field] = n;
+			}
+		}
+
+		for (const field of boolFields) {
+			if (field in request.body) {
+				p[field] = Boolean(request.body[field]);
+			}
+		}
+
+		for (const field of stringFields) {
+			if (field in request.body) {
+				p[field] = String(request.body[field]);
+			}
+		}
+
+		io.emit('playerMoved', p);
+
+		res.json(p);
+	});
+
+	app.post('/debug/restart', (_request, res) => {
+		for (const player of players.values()) {
+			player.x = (Math.random() * 2 - 1) * spawnRange;
+			player.y = 0;
+			player.z = (Math.random() * 2 - 1) * spawnRange;
+			player.rotationY = 0;
+			player.velocityY = 0;
+			player.animation = 'idle';
+			player.dead = false;
+			// Host flag intentionally unchanged.
+
+			io.emit('playerMoved', player);
+		}
+
+		res.json({ok: true, players: [...players.values()]});
+	});
+
+	console.log('Debug page enabled at /debug');
+}
+
 io.on('connection', socket => {
 	console.log(`Player connected: ${socket.id}`);
-	const spawnRange = 6;
+	const isFirstPlayer = players.size === 0;
 	const newPlayer: PlayerState = {
 		id: socket.id,
 		x: (Math.random() * 2 - 1) * spawnRange,
@@ -53,6 +127,8 @@ io.on('connection', socket => {
 		velocityY: 0,
 		animation: 'idle',
 		modelFile: pickModel(),
+		dead: false,
+		host: isFirstPlayer,
 	};
 	players.set(socket.id, newPlayer);
 
@@ -70,6 +146,10 @@ io.on('connection', socket => {
 			return;
 		}
 
+		if (p.dead) {
+			return;
+		}
+
 		p.x = data.x;
 		p.y = data.y;
 		p.z = data.z;
@@ -84,6 +164,11 @@ io.on('connection', socket => {
 	});
 
 	socket.on('attack', (data: {x: number; z: number; rotationY: number}) => {
+		const attacker = players.get(socket.id);
+		if (!attacker || attacker.dead) {
+			return;
+		}
+
 		const attackRange = 1;
 		const coneHalfAngle = Math.PI / 3;
 		const knockbackDist = 1;
@@ -94,6 +179,10 @@ io.on('connection', socket => {
 
 		for (const [id, target] of players) {
 			if (id === socket.id) {
+				continue;
+			}
+
+			if (target.dead) {
 				continue;
 			}
 

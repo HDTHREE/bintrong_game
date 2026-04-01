@@ -16,6 +16,23 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 document.body.append(renderer.domElement);
 
+const deadOverlay = document.createElement('div');
+deadOverlay.textContent = 'YOU ARE DEAD';
+deadOverlay.style.position = 'fixed';
+deadOverlay.style.inset = '0';
+deadOverlay.style.display = 'none';
+deadOverlay.style.alignItems = 'center';
+deadOverlay.style.justifyContent = 'center';
+deadOverlay.style.color = '#ff2020';
+deadOverlay.style.fontFamily = 'Impact, Haettenschweiler, "Arial Black", sans-serif';
+deadOverlay.style.fontSize = 'clamp(2rem, 8vw, 5rem)';
+deadOverlay.style.letterSpacing = '0.12em';
+deadOverlay.style.textShadow = '0 0 16px rgba(255, 0, 0, 0.9)';
+deadOverlay.style.background = 'rgba(0, 0, 0, 0.28)';
+deadOverlay.style.pointerEvents = 'none';
+deadOverlay.style.zIndex = '9999';
+document.body.append(deadOverlay);
+
 const dirLight = new THREE.DirectionalLight(0xFF_FF_FF, 1.2);
 dirLight.position.set(8, 15, 10);
 dirLight.castShadow = true;
@@ -59,6 +76,14 @@ let stunTimer = 0;
 let isStunned = false;
 
 let localModelFile = 'Colobus_Animations.glb';
+let isLocalDead = false;
+let socketId = '';
+
+function setLocalDead(nextDead: boolean) {
+	isLocalDead = nextDead;
+	player.visible = !nextDead;
+	deadOverlay.style.display = nextDead ? 'flex' : 'none';
+}
 
 function fadeToAction(next: THREE.AnimationAction, duration = 0.2) {
 	if (next === currentAction) {
@@ -91,7 +116,37 @@ function pickRandomIdle() {
 const modelsDir = 'assets/models/players/';
 const loader = new GLTFLoader();
 
+function disposeGroupContents(group: THREE.Group) {
+	for (const child of group.children) {
+		child.traverse(node => {
+			if ((node as THREE.Mesh).isMesh) {
+				const mesh = node as THREE.Mesh;
+				mesh.geometry.dispose();
+				if (Array.isArray(mesh.material)) {
+					for (const mat of mesh.material) {
+						mat.dispose();
+					}
+				} else {
+					mesh.material.dispose();
+				}
+			}
+		});
+		group.remove(child);
+	}
+}
+
 function loadLocalModel(file: string) {
+	localModelFile = file;
+	disposeGroupContents(player);
+	mixer?.stopAllAction();
+	mixer = undefined;
+	idleActions = [];
+	currentAction = undefined;
+	currentIdleIndex = -1;
+	for (const key of Object.keys(actions)) {
+		delete actions[key];
+	}
+
 	loader.load(modelsDir + file, gltf => {
 		const model = gltf.scene;
 		model.traverse(child => {
@@ -154,39 +209,30 @@ type RemotePlayer = {
 	targetPos: THREE.Vector3;
 	targetRotY: number;
 	animation: string;
+	modelFile: string;
+	dead: boolean;
 };
 
 const remotePlayers = new Map<string, RemotePlayer>();
 
-function addRemotePlayer(data: RemotePlayerData) {
-	if (remotePlayers.has(data.id)) {
-		return;
+function loadRemoteModel(remote: RemotePlayer, modelFile: string) {
+	remote.modelFile = modelFile;
+	disposeGroupContents(remote.group);
+	remote.mixer?.stopAllAction();
+	remote.mixer = undefined;
+	remote.currentAction = undefined;
+	for (const key of Object.keys(remote.actions)) {
+		delete remote.actions[key];
 	}
 
-	const group = new THREE.Group();
-	group.position.set(data.x, data.y, data.z);
-	group.rotation.y = data.rotationY;
-	scene.add(group);
-
-	const remote: RemotePlayer = {
-		group,
-		mixer: undefined,
-		actions: {},
-		currentAction: undefined,
-		targetPos: new THREE.Vector3(data.x, data.y, data.z),
-		targetRotY: data.rotationY,
-		animation: data.animation,
-	};
-	remotePlayers.set(data.id, remote);
-
-	loader.load(modelsDir + data.modelFile, gltf => {
+	loader.load(modelsDir + modelFile, gltf => {
 		const model = gltf.scene;
 		model.traverse(child => {
 			if ((child as THREE.Mesh).isMesh) {
 				child.castShadow = true;
 			}
 		});
-		group.add(model);
+		remote.group.add(model);
 
 		remote.mixer = new THREE.AnimationMixer(model);
 		for (const clip of gltf.animations) {
@@ -230,6 +276,33 @@ function addRemotePlayer(data: RemotePlayerData) {
 	});
 }
 
+function addRemotePlayer(data: RemotePlayerData) {
+	if (remotePlayers.has(data.id)) {
+		return;
+	}
+
+	const group = new THREE.Group();
+	group.position.set(data.x, data.y, data.z);
+	group.rotation.y = data.rotationY;
+	scene.add(group);
+
+	const remote: RemotePlayer = {
+		group,
+		mixer: undefined,
+		actions: {},
+		currentAction: undefined,
+		targetPos: new THREE.Vector3(data.x, data.y, data.z),
+		targetRotY: data.rotationY,
+		animation: data.animation,
+		modelFile: data.modelFile,
+		dead: data.dead,
+	};
+	group.visible = !data.dead;
+	remotePlayers.set(data.id, remote);
+
+	loadRemoteModel(remote, data.modelFile);
+}
+
 function removeRemotePlayer(id: string) {
 	const remote = remotePlayers.get(id);
 	if (!remote) {
@@ -262,6 +335,16 @@ function updateRemotePlayer(data: RemotePlayerData) {
 	remote.targetPos.set(data.x, data.y, data.z);
 	remote.targetRotY = data.rotationY;
 	remote.animation = data.animation;
+	remote.dead = data.dead;
+	remote.group.visible = !data.dead;
+
+	if (data.modelFile !== remote.modelFile) {
+		loadRemoteModel(remote, data.modelFile);
+	}
+
+	if (data.dead) {
+		return;
+	}
 
 	if (remote.mixer) {
 		let nextAction: THREE.AnimationAction | undefined;
@@ -293,6 +376,7 @@ function updateRemotePlayer(data: RemotePlayerData) {
 
 connect({
 	onInit(payload) {
+		socketId = payload.id;
 		localModelFile = payload.modelFile;
 		loadLocalModel(localModelFile);
 
@@ -300,6 +384,7 @@ connect({
 		const me = payload.players[payload.id];
 		if (me) {
 			player.position.set(me.x, me.y, me.z);
+			setLocalDead(me.dead);
 		}
 
 		for (const [id, pdata] of Object.entries(payload.players)) {
@@ -315,6 +400,20 @@ connect({
 		console.log(`Player joined: ${playerData.id}`);
 	},
 	onPlayerMoved(playerData) {
+		if (playerData.id === socketId) {
+			if (playerData.modelFile !== localModelFile) {
+				loadLocalModel(playerData.modelFile);
+			}
+
+			setLocalDead(playerData.dead);
+			player.position.set(playerData.x, playerData.y, playerData.z);
+			player.rotation.y = playerData.rotationY;
+			velocity.y = playerData.velocityY;
+			onGround = player.position.y <= 0;
+			currentAnimName = playerData.animation;
+			return;
+		}
+
 		updateRemotePlayer(playerData);
 	},
 	onPlayerLeft(id) {
@@ -389,7 +488,7 @@ function animate() {
 	const dt = Math.min(clock.getDelta(), 0.05);
 
 	// Tick stun timer
-	if (stunTimer > 0) {
+	if (!isLocalDead && stunTimer > 0) {
 		stunTimer -= dt;
 		if (stunTimer <= 0) {
 			isStunned = false;
@@ -397,19 +496,19 @@ function animate() {
 	}
 
 	const dir = new THREE.Vector3();
-	if (!isStunned && keys.KeyW) {
+	if (!isLocalDead && !isStunned && keys.KeyW) {
 		dir.z -= 1;
 	}
 
-	if (!isStunned && keys.KeyS) {
+	if (!isLocalDead && !isStunned && keys.KeyS) {
 		dir.z += 1;
 	}
 
-	if (!isStunned && keys.KeyA) {
+	if (!isLocalDead && !isStunned && keys.KeyA) {
 		dir.x -= 1;
 	}
 
-	if (!isStunned && keys.KeyD) {
+	if (!isLocalDead && !isStunned && keys.KeyD) {
 		dir.x += 1;
 	}
 
@@ -425,7 +524,7 @@ function animate() {
 		player.rotation.y = Math.atan2(dir.x, dir.z);
 	}
 
-	if (!isStunned && keys.Space && onGround) {
+	if (!isLocalDead && !isStunned && keys.Space && onGround) {
 		velocity.y = jumpSpeed;
 		onGround = false;
 	}
@@ -438,7 +537,7 @@ function animate() {
 		}
 	}
 
-	if (keys.Enter && !isAttacking && !isStunned) {
+	if (!isLocalDead && keys.Enter && !isAttacking && !isStunned) {
 		isAttacking = true;
 		attackTimer = attackCooldown;
 		currentAnimName = 'attack';
@@ -469,30 +568,36 @@ function animate() {
 		onGround = true;
 	}
 
-	for (const remote of remotePlayers.values()) {
-		const dx = player.position.x - remote.group.position.x;
-		const dz = player.position.z - remote.group.position.z;
-		const dist = Math.hypot(dx, dz);
-		const minDist = playerRadius * 2;
+	if (!isLocalDead) {
+		for (const remote of remotePlayers.values()) {
+			if (remote.dead) {
+				continue;
+			}
 
-		if (dist < minDist && dist > 0) {
-			const overlap = minDist - dist;
-			const nx = dx / dist;
-			const nz = dz / dist;
-			const half = overlap * 0.5;
-			player.position.x += nx * half;
-			player.position.z += nz * half;
-			remote.group.position.x -= nx * half;
-			remote.group.position.z -= nz * half;
-			remote.targetPos.x -= nx * half;
-			remote.targetPos.z -= nz * half;
+			const dx = player.position.x - remote.group.position.x;
+			const dz = player.position.z - remote.group.position.z;
+			const dist = Math.hypot(dx, dz);
+			const minDist = playerRadius * 2;
+
+			if (dist < minDist && dist > 0) {
+				const overlap = minDist - dist;
+				const nx = dx / dist;
+				const nz = dz / dist;
+				const half = overlap * 0.5;
+				player.position.x += nx * half;
+				player.position.z += nz * half;
+				remote.group.position.x -= nx * half;
+				remote.group.position.z -= nz * half;
+				remote.targetPos.x -= nx * half;
+				remote.targetPos.z -= nz * half;
+			}
 		}
 	}
 
 	player.position.x = Math.max(-halfBound, Math.min(halfBound, player.position.x));
 	player.position.z = Math.max(-halfBound, Math.min(halfBound, player.position.z));
 
-	if (mixer) {
+	if (mixer && !isLocalDead) {
 		if (isStunned) {
 			// Keep playing hit animation during stun
 		} else if (isAttacking) {
@@ -533,6 +638,10 @@ function animate() {
 	}
 
 	for (const remote of remotePlayers.values()) {
+		if (remote.dead) {
+			continue;
+		}
+
 		remote.group.position.lerp(remote.targetPos, 0.2);
 		const angleDiff = remote.targetRotY - remote.group.rotation.y;
 		remote.group.rotation.y += angleDiff * 0.2;
