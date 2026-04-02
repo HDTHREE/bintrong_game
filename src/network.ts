@@ -25,6 +25,7 @@ export type AttackData = {
 	x: number;
 	z: number;
 	rotationY: number;
+	hit: boolean;
 };
 
 export type AnswerZoneData = {

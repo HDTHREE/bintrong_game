@@ -626,6 +626,7 @@ io.on('connection', socket => {
 		const coneHalfAngle = Math.PI / 3;
 		const knockbackDist = 1;
 		const halfBound = platformHalfBound;
+		let didHit = false;
 
 		const forwardX = Math.sin(data.rotationY);
 		const forwardZ = Math.cos(data.rotationY);
@@ -649,6 +650,7 @@ io.on('connection', socket => {
 			const angle = Math.acos(Math.min(1, Math.max(-1, dot)));
 
 			if (angle < coneHalfAngle) {
+				didHit = true;
 				target.x += toTargetX * knockbackDist;
 				target.z += toTargetZ * knockbackDist;
 				target.x = Math.max(-halfBound, Math.min(halfBound, target.x));
@@ -658,11 +660,12 @@ io.on('connection', socket => {
 			}
 		}
 
-		socket.broadcast.emit('playerAttacked', {
+		io.emit('playerAttacked', {
 			id: socket.id,
 			x: data.x,
 			z: data.z,
 			rotationY: data.rotationY,
+			hit: didHit,
 		});
 	});
 

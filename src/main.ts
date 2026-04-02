@@ -216,13 +216,35 @@ const lightningSoundFiles = [
 	'assets/sounds/lightning/patricksilvey-weather-lightning-2-464187.mp3',
 ];
 
-function playRandomLightningSound() {
-	const file = lightningSoundFiles[Math.floor(Math.random() * lightningSoundFiles.length)];
+const punchSoundFiles = [
+	'assets/sounds/punch/freesound_community-punch-2-37333.mp3',
+	'assets/sounds/punch/soraatwod-punch-416719.mp3',
+];
+
+const missSoundFiles = [
+	'assets/sounds/miss/musicholder-woosh-260275.mp3',
+	'assets/sounds/miss/ribhavagrawal-woosh-230554.mp3',
+];
+
+function playRandomSound(files: string[], volume = 0.5) {
+	const file = files[Math.floor(Math.random() * files.length)];
 	const audio = new Audio(file);
-	audio.volume = 0.5;
+	audio.volume = volume;
 	void audio.play().catch(() => {
 		// Ignore autoplay failures in browsers that require user interaction.
 	});
+}
+
+function playRandomLightningSound() {
+	playRandomSound(lightningSoundFiles, 0.5);
+}
+
+function playRandomPunchSound() {
+	playRandomSound(punchSoundFiles, 0.6);
+}
+
+function playRandomMissSound() {
+	playRandomSound(missSoundFiles, 0.5);
 }
 
 function spawnLightningBolt(targetWorldPosition: THREE.Vector3) {
@@ -985,6 +1007,12 @@ connect({
 		console.log(`Player left: ${id}`);
 	},
 	onPlayerAttacked(data) {
+		if (data.hit) {
+			playRandomPunchSound();
+		} else {
+			playRandomMissSound();
+		}
+
 		// Show attack animation on remote player
 		const remote = remotePlayers.get(data.id);
 		if (remote?.mixer && remote.actions._attack) {
