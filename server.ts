@@ -397,14 +397,6 @@ function eliminatePlayersOutsideCorrectZone() {
 		if (inSafeZone) {
 			continue;
 		}
-
-		io.emit('playerEliminated', {
-			id: player.id,
-			x: player.x,
-			y: player.y,
-			z: player.z,
-			reason: 'wrongAnswerTimeout',
-		});
 		player.dead = true;
 		player.animation = 'idle';
 		io.emit('playerMoved', player);
