@@ -207,6 +207,68 @@ let isLocalHost = false;
 let isAwaitingHostDecision = false;
 let currentHostPromptIsInitialStart = false;
 let currentRoundPhase: RoundState['phase'] = 'waiting';
+let localDeathSequenceToken = 0;
+
+const lightningSoundFiles = [
+	'assets/sounds/lightning/dragon-studio-electric-discharge-386160.mp3',
+	'assets/sounds/lightning/dragon-studio-lightning-spell-386163.mp3',
+	'assets/sounds/lightning/dragon-studio-lightning-strike-386161.mp3',
+	'assets/sounds/lightning/patricksilvey-weather-lightning-2-464187.mp3',
+];
+
+function playRandomLightningSound() {
+	const file = lightningSoundFiles[Math.floor(Math.random() * lightningSoundFiles.length)];
+	const audio = new Audio(file);
+	audio.volume = 0.5;
+	void audio.play().catch(() => {
+		// Ignore autoplay failures in browsers that require user interaction.
+	});
+}
+
+function spawnLightningBolt(targetWorldPosition: THREE.Vector3) {
+	const boltTopY = 10;
+	const boltBottomY = Math.max(0.7, targetWorldPosition.y + 0.7);
+	const pointCount = 10;
+	const points: THREE.Vector3[] = [];
+
+	for (let i = 0; i < pointCount; i++) {
+		const t = i / (pointCount - 1);
+		const y = THREE.MathUtils.lerp(boltTopY, boltBottomY, t);
+		const jitterScale = (1 - t) * 0.28;
+		const x = targetWorldPosition.x + (Math.random() * 2 - 1) * jitterScale;
+		const z = targetWorldPosition.z + (Math.random() * 2 - 1) * jitterScale;
+		points.push(new THREE.Vector3(x, y, z));
+	}
+
+	const boltGeometry = new THREE.BufferGeometry().setFromPoints(points);
+	const boltMaterial = new THREE.LineBasicMaterial({
+		color: 0xc8eeff,
+		transparent: true,
+		opacity: 0.95,
+	});
+	const boltLine = new THREE.Line(boltGeometry, boltMaterial);
+	scene.add(boltLine);
+
+	const flash = new THREE.Mesh(
+		new THREE.SphereGeometry(0.45, 12, 12),
+		new THREE.MeshBasicMaterial({
+			color: 0xe9fbff,
+			transparent: true,
+			opacity: 0.88,
+		}),
+	);
+	flash.position.set(targetWorldPosition.x, boltBottomY, targetWorldPosition.z);
+	scene.add(flash);
+
+	setTimeout(() => {
+		scene.remove(boltLine);
+		scene.remove(flash);
+		boltGeometry.dispose();
+		boltMaterial.dispose();
+		flash.geometry.dispose();
+		(flash.material as THREE.Material).dispose();
+	}, 130);
+}
 
 function showHostDecisionDialog() {
 	hostDecisionTitle.textContent = currentHostPromptIsInitialStart ? 'Start Game?' : 'Play Again?';
@@ -249,15 +311,72 @@ hostDecisionBackButton.addEventListener('click', () => {
 function updateHostDecisionOverlay(roundState: RoundState) {
 	const showWaitingForHost = roundState.phase === 'hostPrompt' && !isLocalHost;
 	hostDecisionOverlay.style.display = showWaitingForHost ? 'flex' : 'none';
-	deadOverlay.style.display = showWaitingForHost
-		? 'none'
-		: (isLocalDead ? 'flex' : 'none');
+	deadOverlay.style.display = isLocalDead && !showWaitingForHost ? 'flex' : 'none';
+}
+
+function refreshStatusOverlays() {
+	const showWaitingForHost = currentRoundPhase === 'hostPrompt' && !isLocalHost;
+	hostDecisionOverlay.style.display = showWaitingForHost ? 'flex' : 'none';
+	deadOverlay.style.display = isLocalDead && !showWaitingForHost ? 'flex' : 'none';
 }
 
 function setLocalDead(nextDead: boolean) {
+	if (!nextDead) {
+		localDeathSequenceToken++;
+	}
+
 	isLocalDead = nextDead;
 	player.visible = !nextDead;
-	deadOverlay.style.display = nextDead ? 'flex' : 'none';
+	refreshStatusOverlays();
+}
+
+function playDeathAnimation(
+	targetMixer: THREE.AnimationMixer | undefined,
+	targetActions: Record<string, THREE.AnimationAction>,
+	currentPlayingAction: THREE.AnimationAction | undefined,
+	assignCurrentAction: (action: THREE.AnimationAction) => void,
+) {
+	if (!targetMixer || !targetActions._death) {
+		return;
+	}
+
+	if (currentPlayingAction && currentPlayingAction !== targetActions._death) {
+		currentPlayingAction.fadeOut(0.03);
+	}
+
+	targetActions._death.reset();
+	targetActions._death.setLoop(THREE.LoopOnce, 1);
+	targetActions._death.clampWhenFinished = true;
+	targetActions._death.play();
+	assignCurrentAction(targetActions._death);
+}
+
+function runDeathSequence(
+	params: {
+		worldPosition: THREE.Vector3;
+		playDeath: () => void;
+		finalizeDeath: () => void;
+		isStale: () => boolean;
+	},
+) {
+	params.playDeath();
+
+	setTimeout(() => {
+		if (params.isStale()) {
+			return;
+		}
+
+		spawnLightningBolt(params.worldPosition);
+		playRandomLightningSound();
+	}, 10);
+
+	setTimeout(() => {
+		if (params.isStale()) {
+			return;
+		}
+
+		params.finalizeDeath();
+	}, 40);
 }
 
 function fadeToAction(next: THREE.AnimationAction, duration = 0.2) {
@@ -337,12 +456,14 @@ function loadLocalModel(file: string) {
 			actions[clip.name] = mixer.clipAction(clip);
 		}
 
+		// Pretty sure most of these are not needed since I got new assets but not worth the time making cleaner.
 		const walkKey = Object.keys(actions).find(n => /walk/i.test(n));
 		const jumpKey = Object.keys(actions).find(n => /jump/i.test(n));
 		const idleKeys = Object.keys(actions).filter(n => /idle/i.test(n));
 		const reservedKeys = new Set([walkKey, jumpKey, ...idleKeys].filter(Boolean));
 		const attackKey = Object.keys(actions).find(n => /attack|bite|hit|punch|swipe|scratch|strike|claw|snap|headbutt/i.test(n))
 			?? Object.keys(actions).find(n => !reservedKeys.has(n));
+		const deathKey = Object.keys(actions).find(n => /death|die|dead|ko|defeat/i.test(n));
 
 		if (walkKey) {
 			actions._walk = actions[walkKey];
@@ -369,6 +490,12 @@ function loadLocalModel(file: string) {
 			actions._hit.clampWhenFinished = true;
 		}
 
+		if (deathKey) {
+			actions._death = actions[deathKey];
+			actions._death.setLoop(THREE.LoopOnce, 1);
+			actions._death.clampWhenFinished = true;
+		}
+
 		idleActions = idleKeys.map(k => actions[k]);
 		pickRandomIdle();
 
@@ -386,6 +513,7 @@ type RemotePlayer = {
 	animation: string;
 	modelFile: string;
 	dead: boolean;
+	deathSequenceToken: number;
 };
 
 type ZoneVisual = {
@@ -616,6 +744,7 @@ function loadRemoteModel(remote: RemotePlayer, modelFile: string) {
 		const rReserved = new Set([walkKey, jumpKey, ...idleKeys].filter(Boolean));
 		const attackKey = Object.keys(remote.actions).find(n => /attack|bite|hit|punch|swipe|scratch|strike|claw|snap|headbutt/i.test(n))
 			?? Object.keys(remote.actions).find(n => !rReserved.has(n));
+		const rDeathKey = Object.keys(remote.actions).find(n => /death|die|dead|ko|defeat/i.test(n));
 
 		if (walkKey) {
 			remote.actions._walk = remote.actions[walkKey];
@@ -637,6 +766,12 @@ function loadRemoteModel(remote: RemotePlayer, modelFile: string) {
 			remote.actions._hit = remote.actions[rHitKey];
 			remote.actions._hit.setLoop(THREE.LoopOnce, 1);
 			remote.actions._hit.clampWhenFinished = true;
+		}
+
+		if (rDeathKey) {
+			remote.actions._death = remote.actions[rDeathKey];
+			remote.actions._death.setLoop(THREE.LoopOnce, 1);
+			remote.actions._death.clampWhenFinished = true;
 		}
 
 		if (idleKeys.length > 0) {
@@ -667,6 +802,7 @@ function addRemotePlayer(data: RemotePlayerData) {
 		animation: data.animation,
 		modelFile: data.modelFile,
 		dead: data.dead,
+		deathSequenceToken: 0,
 	};
 	group.visible = !data.dead;
 	remotePlayers.set(data.id, remote);
@@ -706,14 +842,40 @@ function updateRemotePlayer(data: RemotePlayerData) {
 	remote.targetPos.set(data.x, data.y, data.z);
 	remote.targetRotY = data.rotationY;
 	remote.animation = data.animation;
+	const justDied = !remote.dead && data.dead;
 	remote.dead = data.dead;
-	remote.group.visible = !data.dead;
+	if (!data.dead) {
+		remote.deathSequenceToken++;
+		remote.group.visible = true;
+	}
 
 	if (data.modelFile && data.modelFile !== remote.modelFile) {
 		loadRemoteModel(remote, data.modelFile);
 	}
 
+	if (justDied) {
+		const token = ++remote.deathSequenceToken;
+		remote.group.visible = true;
+		const worldPosition = new THREE.Vector3();
+		remote.group.getWorldPosition(worldPosition);
+
+		runDeathSequence({
+			worldPosition,
+			playDeath: () => {
+				playDeathAnimation(remote.mixer, remote.actions, remote.currentAction, action => {
+					remote.currentAction = action;
+				});
+			},
+			finalizeDeath: () => {
+				remote.group.visible = false;
+			},
+			isStale: () => token !== remote.deathSequenceToken || !remote.dead,
+		});
+		return;
+	}
+
 	if (data.dead) {
+		remote.group.visible = false;
 		return;
 	}
 
@@ -780,8 +942,30 @@ connect({
 				loadLocalModel(playerData.modelFile);
 			}
 
-			setLocalDead(playerData.dead);
+			const justDied = !isLocalDead && playerData.dead;
+			if (justDied) {
+				const token = ++localDeathSequenceToken;
+				isLocalDead = true;
+				player.visible = true;
+				runDeathSequence({
+					worldPosition: player.getWorldPosition(new THREE.Vector3()),
+					playDeath: () => {
+						playDeathAnimation(mixer, actions, currentAction, action => {
+							currentAction = action;
+							currentAnimName = 'death';
+						});
+					},
+					finalizeDeath: () => {
+						setLocalDead(true);
+					},
+					isStale: () => token !== localDeathSequenceToken || !isLocalDead,
+				});
+			} else {
+				setLocalDead(playerData.dead);
+			}
+
 			isLocalHost = playerData.host;
+			refreshStatusOverlays();
 			if (!isLocalHost) {
 				isAwaitingHostDecision = false;
 				hideHostDecisionDialog();
