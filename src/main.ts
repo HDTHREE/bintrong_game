@@ -5,7 +5,6 @@ import {
 	sendUpdate,
 	sendAttack,
 	sendHostGameDecision,
-	type PlayerEliminatedData,
 	type RemotePlayerData,
 	type RoundState,
 } from './network';
@@ -208,16 +207,6 @@ let isLocalHost = false;
 let isAwaitingHostDecision = false;
 let currentHostPromptIsInitialStart = false;
 let currentRoundPhase: RoundState['phase'] = 'waiting';
-let pendingLocalTimeoutDeath = false;
-
-const pendingRemoteTimeoutDeaths = new Set<string>();
-
-const lightningSoundFiles = [
-	'assets/sounds/lightning/dragon-studio-lightning-spell-386163.mp3',
-	'assets/sounds/lightning/patricksilvey-weather-lightning-2-464187.mp3',
-	'assets/sounds/lightning/dragon-studio-electric-discharge-386160.mp3',
-	'assets/sounds/lightning/dragon-studio-lightning-strike-386161.mp3',
-];
 
 function showHostDecisionDialog() {
 	hostDecisionTitle.textContent = currentHostPromptIsInitialStart ? 'Start Game?' : 'Play Again?';
@@ -269,123 +258,6 @@ function setLocalDead(nextDead: boolean) {
 	isLocalDead = nextDead;
 	player.visible = !nextDead;
 	deadOverlay.style.display = nextDead ? 'flex' : 'none';
-}
-
-function playRandomLightningSound() {
-	const file = lightningSoundFiles[Math.floor(Math.random() * lightningSoundFiles.length)];
-	const audio = new Audio(file);
-	audio.volume = 0.5;
-	void audio.play().catch(() => {
-		// Ignore autoplay failures when browser policies block immediate playback.
-	});
-}
-
-function spawnLightningStrike(position: THREE.Vector3) {
-	const boltHeight = 9;
-	const bolt = new THREE.Mesh(
-		new THREE.CylinderGeometry(0.05, 0.14, boltHeight, 6),
-		new THREE.MeshBasicMaterial({
-			color: 0xcd_e9_ff,
-			transparent: true,
-			opacity: 0.96,
-		}),
-	);
-	bolt.position.set(position.x, position.y + boltHeight / 2, position.z);
-	bolt.rotation.y = Math.random() * Math.PI;
-
-	const scorch = new THREE.Mesh(
-		new THREE.CircleGeometry(0.9, 32),
-		new THREE.MeshBasicMaterial({
-			color: 0xf4_fb_ff,
-			transparent: true,
-			opacity: 0.8,
-		}),
-	);
-	scorch.rotation.x = -Math.PI / 2;
-	scorch.position.set(position.x, 0.03, position.z);
-
-	const flash = new THREE.PointLight(0xd8_f2_ff, 8, 14, 2);
-	flash.position.set(position.x, position.y + 2.2, position.z);
-
-	scene.add(bolt);
-	scene.add(scorch);
-	scene.add(flash);
-
-	setTimeout(() => {
-		scene.remove(bolt);
-		scene.remove(scorch);
-		scene.remove(flash);
-		bolt.geometry.dispose();
-		(bolt.material as THREE.Material).dispose();
-		scorch.geometry.dispose();
-		(scorch.material as THREE.Material).dispose();
-	}, 120);
-}
-
-function playTimedDeathAction(
-	action: THREE.AnimationAction | undefined,
-	setCurrentAction: (next: THREE.AnimationAction) => void,
-) {
-	if (!action) {
-		return;
-	}
-
-	action.reset();
-	action.setEffectiveWeight(1);
-	action.setEffectiveTimeScale(1);
-	action.play();
-	setCurrentAction(action);
-	setTimeout(() => {
-		action.stop();
-	}, 40);
-}
-
-function handleTimeoutElimination(data: PlayerEliminatedData) {
-	const strikePos = new THREE.Vector3(data.x, data.y, data.z);
-	playRandomLightningSound();
-
-	if (data.id === socketId) {
-		pendingLocalTimeoutDeath = true;
-		player.visible = true;
-		playTimedDeathAction(actions._death, next => {
-			currentAction = next;
-			currentAnimName = 'death';
-		});
-
-		setTimeout(() => {
-			spawnLightningStrike(strikePos);
-		}, 10);
-
-		setTimeout(() => {
-			pendingLocalTimeoutDeath = false;
-			setLocalDead(true);
-		}, 50);
-		return;
-	}
-
-	const remote = remotePlayers.get(data.id);
-	if (!remote) {
-		setTimeout(() => {
-			spawnLightningStrike(strikePos);
-		}, 10);
-		return;
-	}
-
-	pendingRemoteTimeoutDeaths.add(data.id);
-	remote.group.visible = true;
-	playTimedDeathAction(remote.actions._death, next => {
-		remote.currentAction = next;
-	});
-
-	setTimeout(() => {
-		spawnLightningStrike(remote.group.position.clone());
-	}, 10);
-
-	setTimeout(() => {
-		remote.dead = true;
-		remote.group.visible = false;
-		pendingRemoteTimeoutDeaths.delete(data.id);
-	}, 50);
 }
 
 function fadeToAction(next: THREE.AnimationAction, duration = 0.2) {
@@ -471,7 +343,6 @@ function loadLocalModel(file: string) {
 		const reservedKeys = new Set([walkKey, jumpKey, ...idleKeys].filter(Boolean));
 		const attackKey = Object.keys(actions).find(n => /attack|bite|hit|punch|swipe|scratch|strike|claw|snap|headbutt/i.test(n))
 			?? Object.keys(actions).find(n => !reservedKeys.has(n));
-		const deathKey = Object.keys(actions).find(n => /death|die|dead|defeat|knockout/i.test(n));
 
 		if (walkKey) {
 			actions._walk = actions[walkKey];
@@ -488,13 +359,6 @@ function loadLocalModel(file: string) {
 			console.log('Attack animation mapped to:', attackKey);
 		} else {
 			console.warn('No attack animation found in clips:', Object.keys(actions));
-		}
-
-		if (deathKey) {
-			actions._death = actions[deathKey];
-			actions._death.setLoop(THREE.LoopOnce, 1);
-			actions._death.clampWhenFinished = true;
-			console.log('Death animation mapped to:', deathKey);
 		}
 
 		const hitKey = Object.keys(actions).find(n => /hurt|damage|pain|flinch|stagger|react|gethit|hit/i.test(n))
@@ -752,7 +616,6 @@ function loadRemoteModel(remote: RemotePlayer, modelFile: string) {
 		const rReserved = new Set([walkKey, jumpKey, ...idleKeys].filter(Boolean));
 		const attackKey = Object.keys(remote.actions).find(n => /attack|bite|hit|punch|swipe|scratch|strike|claw|snap|headbutt/i.test(n))
 			?? Object.keys(remote.actions).find(n => !rReserved.has(n));
-		const deathKey = Object.keys(remote.actions).find(n => /death|die|dead|defeat|knockout/i.test(n));
 
 		if (walkKey) {
 			remote.actions._walk = remote.actions[walkKey];
@@ -766,12 +629,6 @@ function loadRemoteModel(remote: RemotePlayer, modelFile: string) {
 			remote.actions._attack = remote.actions[attackKey];
 			remote.actions._attack.setLoop(THREE.LoopOnce, 1);
 			remote.actions._attack.clampWhenFinished = true;
-		}
-
-		if (deathKey) {
-			remote.actions._death = remote.actions[deathKey];
-			remote.actions._death.setLoop(THREE.LoopOnce, 1);
-			remote.actions._death.clampWhenFinished = true;
 		}
 
 		const rHitKey = Object.keys(remote.actions).find(n => /hurt|damage|pain|flinch|stagger|react|gethit|hit/i.test(n))
@@ -849,10 +706,8 @@ function updateRemotePlayer(data: RemotePlayerData) {
 	remote.targetPos.set(data.x, data.y, data.z);
 	remote.targetRotY = data.rotationY;
 	remote.animation = data.animation;
-	if (!data.dead || !pendingRemoteTimeoutDeaths.has(data.id)) {
-		remote.dead = data.dead;
-		remote.group.visible = !data.dead;
-	}
+	remote.dead = data.dead;
+	remote.group.visible = !data.dead;
 
 	if (data.modelFile && data.modelFile !== remote.modelFile) {
 		loadRemoteModel(remote, data.modelFile);
@@ -925,9 +780,7 @@ connect({
 				loadLocalModel(playerData.modelFile);
 			}
 
-			if (!playerData.dead || !pendingLocalTimeoutDeath) {
-				setLocalDead(playerData.dead);
-			}
+			setLocalDead(playerData.dead);
 			isLocalHost = playerData.host;
 			if (!isLocalHost) {
 				isAwaitingHostDecision = false;
@@ -978,11 +831,6 @@ connect({
 			actions._hit.play();
 			currentAction = actions._hit;
 			currentAnimName = 'hit';
-		}
-	},
-	onPlayerEliminated(data) {
-		if (data.reason === 'wrongAnswerTimeout') {
-			handleTimeoutElimination(data);
 		}
 	},
 	onRoundState(state) {

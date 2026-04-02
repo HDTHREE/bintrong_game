@@ -27,14 +27,6 @@ export type AttackData = {
 	rotationY: number;
 };
 
-export type PlayerEliminatedData = {
-	id: string;
-	x: number;
-	y: number;
-	z: number;
-	reason: 'wrongAnswerTimeout';
-};
-
 export type AnswerZoneData = {
 	id: number;
 	x: number;
@@ -60,7 +52,6 @@ export type NetworkCallbacks = {
 	onPlayerLeft: (id: string) => void;
 	onPlayerAttacked: (data: AttackData) => void;
 	onKnockback: (data: {x: number; z: number}) => void;
-	onPlayerEliminated: (data: PlayerEliminatedData) => void;
 	onRoundState: (state: RoundState) => void;
 	onHostGamePrompt: (payload: {initialStart: boolean}) => void;
 };
@@ -93,10 +84,6 @@ export function connect(callbacks: NetworkCallbacks) {
 
 	socket.on('knockback', (data: {x: number; z: number}) => {
 		callbacks.onKnockback(data);
-	});
-
-	socket.on('playerEliminated', (data: PlayerEliminatedData) => {
-		callbacks.onPlayerEliminated(data);
 	});
 
 	socket.on('roundState', (state: RoundState) => {
