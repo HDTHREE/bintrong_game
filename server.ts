@@ -43,7 +43,7 @@ type AnswerZone = {
 };
 
 type RoundState = {
-	phase: 'waiting' | 'question' | 'break';
+	phase: 'waiting' | 'question' | 'break' | 'hostPrompt';
 	round: number;
 	question: string;
 	timeLeftMs: number;
@@ -89,6 +89,8 @@ let triviaCursor = 0;
 let currentCorrectAnswer = '';
 let phaseEndsAt = 0;
 let lastStateBroadcastAt = 0;
+let awaitingHostDecision = false;
+let hostDecisionKind: 'initial' | 'replay' = 'initial';
 
 let roundState: RoundState = {
 	phase: 'waiting',
@@ -282,7 +284,54 @@ function alivePlayerCount(): number {
 	return count;
 }
 
+function getHostPlayer(): PlayerState | undefined {
+	for (const player of players.values()) {
+		if (player.host) {
+			return player;
+		}
+	}
+
+	return undefined;
+}
+
+function ensureHostAssigned() {
+	const host = getHostPlayer();
+	if (host || players.size === 0) {
+		return;
+	}
+
+	const nextHost = players.values().next().value as PlayerState | undefined;
+	if (!nextHost) {
+		return;
+	}
+
+	nextHost.host = true;
+	io.emit('playerMoved', nextHost);
+}
+
+function startHostDecisionPrompt(kind: 'initial' | 'replay') {
+	awaitingHostDecision = true;
+	hostDecisionKind = kind;
+	roundState = {
+		phase: 'hostPrompt',
+		round: roundState.round,
+		question: 'Waiting for host',
+		timeLeftMs: 0,
+		revealedAnswerCount: 0,
+		zones: [],
+	};
+	broadcastRoundState(true);
+
+	const host = getHostPlayer();
+	if (!host) {
+		return;
+	}
+
+	io.to(host.id).emit('hostGamePrompt', {initialStart: kind === 'initial'});
+}
+
 function restartGame() {
+	awaitingHostDecision = false;
 	roundState.round = 0;
 
 	for (const player of players.values()) {
@@ -349,6 +398,13 @@ function eliminatePlayersOutsideCorrectZone() {
 			continue;
 		}
 
+		io.emit('playerEliminated', {
+			id: player.id,
+			x: player.x,
+			y: player.y,
+			z: player.z,
+			reason: 'wrongAnswerTimeout',
+		});
 		player.dead = true;
 		player.animation = 'idle';
 		io.emit('playerMoved', player);
@@ -369,6 +425,18 @@ function startBreakRound() {
 }
 
 function tickRoundLoop() {
+	if (awaitingHostDecision) {
+		if (!getHostPlayer()) {
+			ensureHostAssigned();
+			const reassignedHost = getHostPlayer();
+			if (reassignedHost) {
+				io.to(reassignedHost.id).emit('hostGamePrompt', {initialStart: hostDecisionKind === 'initial'});
+			}
+		}
+
+		return;
+	}
+
 	if (players.size === 0) {
 		if (roundState.phase !== 'waiting') {
 			setWaitingState('Waiting for players...');
@@ -379,7 +447,7 @@ function tickRoundLoop() {
 	}
 
 	if (roundState.phase === 'waiting') {
-		startQuestionRound();
+		startHostDecisionPrompt('initial');
 		return;
 	}
 
@@ -397,14 +465,14 @@ function tickRoundLoop() {
 		}));
 
 		if (alivePlayerCount() === 0) {
-			restartGame();
+			startHostDecisionPrompt('replay');
 			return;
 		}
 
 		if (timeLeftMs <= 0) {
 			eliminatePlayersOutsideCorrectZone();
 			if (alivePlayerCount() === 0) {
-				restartGame();
+				startHostDecisionPrompt('replay');
 				return;
 			}
 
@@ -418,7 +486,7 @@ function tickRoundLoop() {
 
 	if (roundState.phase === 'break') {
 		if (alivePlayerCount() === 0) {
-			restartGame();
+			startHostDecisionPrompt('replay');
 			return;
 		}
 
@@ -520,6 +588,7 @@ io.on('connection', socket => {
 		host: isFirstPlayer,
 	};
 	players.set(socket.id, newPlayer);
+	ensureHostAssigned();
 
 	socket.emit('init', {
 		id: socket.id,
@@ -532,6 +601,10 @@ io.on('connection', socket => {
 	socket.emit('roundState', roundState);
 
 	socket.on('playerUpdate', (data: Omit<PlayerState, 'id' | 'modelFile'>) => {
+		if (awaitingHostDecision) {
+			return;
+		}
+
 		const p = players.get(socket.id);
 		if (!p || p.dead) {
 			return;
@@ -544,13 +617,14 @@ io.on('connection', socket => {
 		p.velocityY = data.velocityY;
 		p.animation = data.animation;
 
-		socket.broadcast.emit('playerMoved', {
-			id: socket.id,
-			...data,
-		});
+		socket.broadcast.emit('playerMoved', p);
 	});
 
 	socket.on('attack', (data: {x: number; z: number; rotationY: number}) => {
+		if (awaitingHostDecision) {
+			return;
+		}
+
 		const attacker = players.get(socket.id);
 		if (!attacker || attacker.dead) {
 			return;
@@ -600,14 +674,49 @@ io.on('connection', socket => {
 		});
 	});
 
+	socket.on('hostGameDecision', (data: {startGame: boolean}) => {
+		const host = getHostPlayer();
+		if (!awaitingHostDecision || !host || host.id !== socket.id) {
+			return;
+		}
+
+		if (data.startGame) {
+			restartGame();
+			return;
+		}
+
+		io.emit('roundState', {
+			phase: 'waiting',
+			round: roundState.round,
+			question: 'Host ended the game. Shutting down server...',
+			timeLeftMs: 0,
+			revealedAnswerCount: 0,
+			zones: [],
+		} satisfies RoundState);
+
+		setTimeout(() => {
+			process.exit(0);
+		}, 200);
+	});
+
 	socket.on('disconnect', () => {
 		console.log(`Player disconnected: ${socket.id}`);
 		players.delete(socket.id);
 		io.emit('playerLeft', socket.id);
+		ensureHostAssigned();
 
 		if (players.size === 0) {
+			awaitingHostDecision = false;
 			setWaitingState('Waiting for players...');
 			broadcastRoundState(true);
+			return;
+		}
+
+		if (awaitingHostDecision) {
+			const host = getHostPlayer();
+			if (host) {
+				io.to(host.id).emit('hostGamePrompt', {initialStart: hostDecisionKind === 'initial'});
+			}
 		}
 	});
 });

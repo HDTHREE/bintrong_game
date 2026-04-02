@@ -1,7 +1,13 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js';
 import {
-	connect, sendUpdate, sendAttack, type RemotePlayerData, type RoundState,
+	connect,
+	sendUpdate,
+	sendAttack,
+	sendHostGameDecision,
+	type PlayerEliminatedData,
+	type RemotePlayerData,
+	type RoundState,
 } from './network';
 
 const scene = new THREE.Scene();
@@ -66,6 +72,84 @@ roundQuestion.textContent = 'Waiting for first question';
 roundHud.append(roundTimer, roundQuestion);
 document.body.append(roundHud);
 
+const hostDecisionOverlay = document.createElement('div');
+hostDecisionOverlay.textContent = 'Waiting for host';
+hostDecisionOverlay.style.position = 'fixed';
+hostDecisionOverlay.style.inset = '0';
+hostDecisionOverlay.style.display = 'none';
+hostDecisionOverlay.style.alignItems = 'center';
+hostDecisionOverlay.style.justifyContent = 'center';
+hostDecisionOverlay.style.color = '#ffffff';
+hostDecisionOverlay.style.fontFamily = 'Impact, Haettenschweiler, "Arial Black", sans-serif';
+hostDecisionOverlay.style.fontSize = 'clamp(2rem, 7vw, 4.5rem)';
+hostDecisionOverlay.style.letterSpacing = '0.08em';
+hostDecisionOverlay.style.textShadow = '0 0 18px rgba(0, 0, 0, 0.9)';
+hostDecisionOverlay.style.background = 'rgba(0, 0, 0, 0.42)';
+hostDecisionOverlay.style.pointerEvents = 'none';
+hostDecisionOverlay.style.zIndex = '9998';
+document.body.append(hostDecisionOverlay);
+
+const hostDecisionDialog = document.createElement('dialog');
+hostDecisionDialog.style.padding = '0';
+hostDecisionDialog.style.border = '1px solid rgba(255, 255, 255, 0.35)';
+hostDecisionDialog.style.borderRadius = '14px';
+hostDecisionDialog.style.background = 'rgba(12, 16, 22, 0.95)';
+hostDecisionDialog.style.color = '#ffffff';
+hostDecisionDialog.style.minWidth = 'min(92vw, 460px)';
+hostDecisionDialog.style.boxShadow = '0 18px 42px rgba(0, 0, 0, 0.55)';
+hostDecisionDialog.style.zIndex = '10000';
+
+const hostDecisionPanel = document.createElement('div');
+hostDecisionPanel.style.padding = '20px';
+hostDecisionPanel.style.display = 'grid';
+hostDecisionPanel.style.gap = '14px';
+
+const hostDecisionTitle = document.createElement('h2');
+hostDecisionTitle.textContent = 'Start Game?';
+hostDecisionTitle.style.margin = '0';
+hostDecisionTitle.style.fontFamily = '"Trebuchet MS", Verdana, sans-serif';
+hostDecisionTitle.style.fontSize = '1.7rem';
+hostDecisionTitle.style.letterSpacing = '0.04em';
+
+const hostDecisionText = document.createElement('p');
+hostDecisionText.textContent = 'Click once all players have joined';
+hostDecisionText.style.margin = '0';
+hostDecisionText.style.opacity = '0.92';
+hostDecisionText.style.fontFamily = '"Trebuchet MS", Verdana, sans-serif';
+hostDecisionText.style.fontSize = '1rem';
+
+const hostDecisionButtons = document.createElement('div');
+hostDecisionButtons.style.display = 'grid';
+hostDecisionButtons.style.gridTemplateColumns = 'repeat(2, minmax(0, 1fr))';
+hostDecisionButtons.style.gap = '10px';
+
+const hostDecisionStartButton = document.createElement('button');
+hostDecisionStartButton.type = 'button';
+hostDecisionStartButton.textContent = 'Start';
+hostDecisionStartButton.style.padding = '11px 14px';
+hostDecisionStartButton.style.border = '1px solid rgba(125, 255, 174, 0.85)';
+hostDecisionStartButton.style.borderRadius = '8px';
+hostDecisionStartButton.style.background = '#18a957';
+hostDecisionStartButton.style.color = '#f4fff8';
+hostDecisionStartButton.style.fontWeight = '700';
+hostDecisionStartButton.style.cursor = 'pointer';
+
+const hostDecisionBackButton = document.createElement('button');
+hostDecisionBackButton.type = 'button';
+hostDecisionBackButton.textContent = 'Back';
+hostDecisionBackButton.style.padding = '11px 14px';
+hostDecisionBackButton.style.border = '1px solid rgba(255, 141, 141, 0.9)';
+hostDecisionBackButton.style.borderRadius = '8px';
+hostDecisionBackButton.style.background = '#bd2b2b';
+hostDecisionBackButton.style.color = '#fff5f5';
+hostDecisionBackButton.style.fontWeight = '700';
+hostDecisionBackButton.style.cursor = 'pointer';
+
+hostDecisionButtons.append(hostDecisionStartButton, hostDecisionBackButton);
+hostDecisionPanel.append(hostDecisionTitle, hostDecisionText, hostDecisionButtons);
+hostDecisionDialog.append(hostDecisionPanel);
+document.body.append(hostDecisionDialog);
+
 const dirLight = new THREE.DirectionalLight(0xFF_FF_FF, 1.2);
 dirLight.position.set(8, 15, 10);
 dirLight.castShadow = true;
@@ -120,11 +204,188 @@ let isStunned = false;
 let localModelFile = 'Colobus_Animations.glb';
 let isLocalDead = false;
 let socketId = '';
+let isLocalHost = false;
+let isAwaitingHostDecision = false;
+let currentHostPromptIsInitialStart = false;
+let currentRoundPhase: RoundState['phase'] = 'waiting';
+let pendingLocalTimeoutDeath = false;
+
+const pendingRemoteTimeoutDeaths = new Set<string>();
+
+const lightningSoundFiles = [
+	'assets/sounds/lightning/dragon-studio-lightning-spell-386163.mp3',
+	'assets/sounds/lightning/patricksilvey-weather-lightning-2-464187.mp3',
+	'assets/sounds/lightning/dragon-studio-electric-discharge-386160.mp3',
+	'assets/sounds/lightning/dragon-studio-lightning-strike-386161.mp3',
+];
+
+function showHostDecisionDialog() {
+	hostDecisionTitle.textContent = currentHostPromptIsInitialStart ? 'Start Game?' : 'Play Again?';
+	hostDecisionText.textContent = currentHostPromptIsInitialStart
+		? 'Click once all players have joined'
+		: 'The game has ended. Start another round?';
+	if (!hostDecisionDialog.open) {
+		hostDecisionDialog.showModal();
+	}
+}
+
+function hideHostDecisionDialog() {
+	if (hostDecisionDialog.open) {
+		hostDecisionDialog.close();
+	}
+}
+
+hostDecisionDialog.addEventListener('cancel', event => {
+	event.preventDefault();
+});
+
+hostDecisionStartButton.addEventListener('click', () => {
+	if (!isAwaitingHostDecision) {
+		return;
+	}
+
+	hideHostDecisionDialog();
+	sendHostGameDecision(true);
+});
+
+hostDecisionBackButton.addEventListener('click', () => {
+	if (!isAwaitingHostDecision) {
+		return;
+	}
+
+	hideHostDecisionDialog();
+	sendHostGameDecision(false);
+});
+
+function updateHostDecisionOverlay(roundState: RoundState) {
+	const showWaitingForHost = roundState.phase === 'hostPrompt' && !isLocalHost;
+	hostDecisionOverlay.style.display = showWaitingForHost ? 'flex' : 'none';
+	deadOverlay.style.display = showWaitingForHost
+		? 'none'
+		: (isLocalDead ? 'flex' : 'none');
+}
 
 function setLocalDead(nextDead: boolean) {
 	isLocalDead = nextDead;
 	player.visible = !nextDead;
 	deadOverlay.style.display = nextDead ? 'flex' : 'none';
+}
+
+function playRandomLightningSound() {
+	const file = lightningSoundFiles[Math.floor(Math.random() * lightningSoundFiles.length)];
+	const audio = new Audio(file);
+	audio.volume = 0.5;
+	void audio.play().catch(() => {
+		// Ignore autoplay failures when browser policies block immediate playback.
+	});
+}
+
+function spawnLightningStrike(position: THREE.Vector3) {
+	const boltHeight = 9;
+	const bolt = new THREE.Mesh(
+		new THREE.CylinderGeometry(0.05, 0.14, boltHeight, 6),
+		new THREE.MeshBasicMaterial({
+			color: 0xcd_e9_ff,
+			transparent: true,
+			opacity: 0.96,
+		}),
+	);
+	bolt.position.set(position.x, position.y + boltHeight / 2, position.z);
+	bolt.rotation.y = Math.random() * Math.PI;
+
+	const scorch = new THREE.Mesh(
+		new THREE.CircleGeometry(0.9, 32),
+		new THREE.MeshBasicMaterial({
+			color: 0xf4_fb_ff,
+			transparent: true,
+			opacity: 0.8,
+		}),
+	);
+	scorch.rotation.x = -Math.PI / 2;
+	scorch.position.set(position.x, 0.03, position.z);
+
+	const flash = new THREE.PointLight(0xd8_f2_ff, 8, 14, 2);
+	flash.position.set(position.x, position.y + 2.2, position.z);
+
+	scene.add(bolt);
+	scene.add(scorch);
+	scene.add(flash);
+
+	setTimeout(() => {
+		scene.remove(bolt);
+		scene.remove(scorch);
+		scene.remove(flash);
+		bolt.geometry.dispose();
+		(bolt.material as THREE.Material).dispose();
+		scorch.geometry.dispose();
+		(scorch.material as THREE.Material).dispose();
+	}, 120);
+}
+
+function playTimedDeathAction(
+	action: THREE.AnimationAction | undefined,
+	setCurrentAction: (next: THREE.AnimationAction) => void,
+) {
+	if (!action) {
+		return;
+	}
+
+	action.reset();
+	action.setEffectiveWeight(1);
+	action.setEffectiveTimeScale(1);
+	action.play();
+	setCurrentAction(action);
+	setTimeout(() => {
+		action.stop();
+	}, 40);
+}
+
+function handleTimeoutElimination(data: PlayerEliminatedData) {
+	const strikePos = new THREE.Vector3(data.x, data.y, data.z);
+	playRandomLightningSound();
+
+	if (data.id === socketId) {
+		pendingLocalTimeoutDeath = true;
+		player.visible = true;
+		playTimedDeathAction(actions._death, next => {
+			currentAction = next;
+			currentAnimName = 'death';
+		});
+
+		setTimeout(() => {
+			spawnLightningStrike(strikePos);
+		}, 10);
+
+		setTimeout(() => {
+			pendingLocalTimeoutDeath = false;
+			setLocalDead(true);
+		}, 50);
+		return;
+	}
+
+	const remote = remotePlayers.get(data.id);
+	if (!remote) {
+		setTimeout(() => {
+			spawnLightningStrike(strikePos);
+		}, 10);
+		return;
+	}
+
+	pendingRemoteTimeoutDeaths.add(data.id);
+	remote.group.visible = true;
+	playTimedDeathAction(remote.actions._death, next => {
+		remote.currentAction = next;
+	});
+
+	setTimeout(() => {
+		spawnLightningStrike(remote.group.position.clone());
+	}, 10);
+
+	setTimeout(() => {
+		remote.dead = true;
+		remote.group.visible = false;
+		pendingRemoteTimeoutDeaths.delete(data.id);
+	}, 50);
 }
 
 function fadeToAction(next: THREE.AnimationAction, duration = 0.2) {
@@ -210,6 +471,7 @@ function loadLocalModel(file: string) {
 		const reservedKeys = new Set([walkKey, jumpKey, ...idleKeys].filter(Boolean));
 		const attackKey = Object.keys(actions).find(n => /attack|bite|hit|punch|swipe|scratch|strike|claw|snap|headbutt/i.test(n))
 			?? Object.keys(actions).find(n => !reservedKeys.has(n));
+		const deathKey = Object.keys(actions).find(n => /death|die|dead|defeat|knockout/i.test(n));
 
 		if (walkKey) {
 			actions._walk = actions[walkKey];
@@ -226,6 +488,13 @@ function loadLocalModel(file: string) {
 			console.log('Attack animation mapped to:', attackKey);
 		} else {
 			console.warn('No attack animation found in clips:', Object.keys(actions));
+		}
+
+		if (deathKey) {
+			actions._death = actions[deathKey];
+			actions._death.setLoop(THREE.LoopOnce, 1);
+			actions._death.clampWhenFinished = true;
+			console.log('Death animation mapped to:', deathKey);
 		}
 
 		const hitKey = Object.keys(actions).find(n => /hurt|damage|pain|flinch|stagger|react|gethit|hit/i.test(n))
@@ -429,6 +698,7 @@ function updateZoneVisuals(roundState: RoundState) {
 }
 
 function applyRoundState(roundState: RoundState) {
+	currentRoundPhase = roundState.phase;
 	const secondsLeft = Math.ceil(roundState.timeLeftMs / 1000);
 	if (roundState.phase === 'question') {
 		roundTimer.textContent = `Round ${roundState.round} | ${secondsLeft}s`;
@@ -436,11 +706,19 @@ function applyRoundState(roundState: RoundState) {
 	} else if (roundState.phase === 'break') {
 		roundTimer.textContent = `Break | ${secondsLeft}s`;
 		roundQuestion.textContent = 'Next question incoming...';
+	} else if (roundState.phase === 'hostPrompt') {
+		roundTimer.textContent = currentHostPromptIsInitialStart ? 'Ready' : 'Game Over';
+		roundQuestion.textContent = isLocalHost
+			? (currentHostPromptIsInitialStart
+				? 'Click Start when everyone has joined.'
+				: 'Choose if you want to play again.')
+			: 'Waiting for host';
 	} else {
 		roundTimer.textContent = 'Waiting';
 		roundQuestion.textContent = roundState.question || 'Waiting for players';
 	}
 
+	updateHostDecisionOverlay(roundState);
 	updateZoneVisuals(roundState);
 }
 
@@ -474,6 +752,7 @@ function loadRemoteModel(remote: RemotePlayer, modelFile: string) {
 		const rReserved = new Set([walkKey, jumpKey, ...idleKeys].filter(Boolean));
 		const attackKey = Object.keys(remote.actions).find(n => /attack|bite|hit|punch|swipe|scratch|strike|claw|snap|headbutt/i.test(n))
 			?? Object.keys(remote.actions).find(n => !rReserved.has(n));
+		const deathKey = Object.keys(remote.actions).find(n => /death|die|dead|defeat|knockout/i.test(n));
 
 		if (walkKey) {
 			remote.actions._walk = remote.actions[walkKey];
@@ -487,6 +766,12 @@ function loadRemoteModel(remote: RemotePlayer, modelFile: string) {
 			remote.actions._attack = remote.actions[attackKey];
 			remote.actions._attack.setLoop(THREE.LoopOnce, 1);
 			remote.actions._attack.clampWhenFinished = true;
+		}
+
+		if (deathKey) {
+			remote.actions._death = remote.actions[deathKey];
+			remote.actions._death.setLoop(THREE.LoopOnce, 1);
+			remote.actions._death.clampWhenFinished = true;
 		}
 
 		const rHitKey = Object.keys(remote.actions).find(n => /hurt|damage|pain|flinch|stagger|react|gethit|hit/i.test(n))
@@ -564,10 +849,12 @@ function updateRemotePlayer(data: RemotePlayerData) {
 	remote.targetPos.set(data.x, data.y, data.z);
 	remote.targetRotY = data.rotationY;
 	remote.animation = data.animation;
-	remote.dead = data.dead;
-	remote.group.visible = !data.dead;
+	if (!data.dead || !pendingRemoteTimeoutDeaths.has(data.id)) {
+		remote.dead = data.dead;
+		remote.group.visible = !data.dead;
+	}
 
-	if (data.modelFile !== remote.modelFile) {
+	if (data.modelFile && data.modelFile !== remote.modelFile) {
 		loadRemoteModel(remote, data.modelFile);
 	}
 
@@ -617,6 +904,7 @@ connect({
 		if (me) {
 			player.position.set(me.x, me.y, me.z);
 			setLocalDead(me.dead);
+			isLocalHost = me.host;
 		}
 
 		for (const [id, pdata] of Object.entries(payload.players)) {
@@ -637,7 +925,14 @@ connect({
 				loadLocalModel(playerData.modelFile);
 			}
 
-			setLocalDead(playerData.dead);
+			if (!playerData.dead || !pendingLocalTimeoutDeath) {
+				setLocalDead(playerData.dead);
+			}
+			isLocalHost = playerData.host;
+			if (!isLocalHost) {
+				isAwaitingHostDecision = false;
+				hideHostDecisionDialog();
+			}
 			player.position.set(playerData.x, playerData.y, playerData.z);
 			player.rotation.y = playerData.rotationY;
 			velocity.y = playerData.velocityY;
@@ -685,8 +980,26 @@ connect({
 			currentAnimName = 'hit';
 		}
 	},
+	onPlayerEliminated(data) {
+		if (data.reason === 'wrongAnswerTimeout') {
+			handleTimeoutElimination(data);
+		}
+	},
 	onRoundState(state) {
 		applyRoundState(state);
+		if (state.phase !== 'hostPrompt') {
+			isAwaitingHostDecision = false;
+			hideHostDecisionDialog();
+		}
+	},
+	onHostGamePrompt(payload) {
+		if (!isLocalHost || isAwaitingHostDecision) {
+			return;
+		}
+
+		currentHostPromptIsInitialStart = payload.initialStart;
+		isAwaitingHostDecision = true;
+		showHostDecisionDialog();
 	},
 });
 
@@ -730,20 +1043,28 @@ function animate() {
 		}
 	}
 
+	const controlsLocked = currentRoundPhase === 'hostPrompt';
+	if (controlsLocked) {
+		velocity.y = 0;
+		onGround = true;
+		isAttacking = false;
+		attackTimer = 0;
+	}
+
 	const dir = new THREE.Vector3();
-	if (!isLocalDead && !isStunned && keys.KeyW) {
+	if (!isLocalDead && !isStunned && !controlsLocked && keys.KeyW) {
 		dir.z -= 1;
 	}
 
-	if (!isLocalDead && !isStunned && keys.KeyS) {
+	if (!isLocalDead && !isStunned && !controlsLocked && keys.KeyS) {
 		dir.z += 1;
 	}
 
-	if (!isLocalDead && !isStunned && keys.KeyA) {
+	if (!isLocalDead && !isStunned && !controlsLocked && keys.KeyA) {
 		dir.x -= 1;
 	}
 
-	if (!isLocalDead && !isStunned && keys.KeyD) {
+	if (!isLocalDead && !isStunned && !controlsLocked && keys.KeyD) {
 		dir.x += 1;
 	}
 
@@ -759,7 +1080,7 @@ function animate() {
 		player.rotation.y = Math.atan2(dir.x, dir.z);
 	}
 
-	if (!isLocalDead && !isStunned && keys.Space && onGround) {
+	if (!isLocalDead && !isStunned && !controlsLocked && keys.Space && onGround) {
 		velocity.y = jumpSpeed;
 		onGround = false;
 	}
@@ -772,7 +1093,7 @@ function animate() {
 		}
 	}
 
-	if (!isLocalDead && keys.Enter && !isAttacking && !isStunned) {
+	if (!isLocalDead && !controlsLocked && keys.Enter && !isAttacking && !isStunned) {
 		isAttacking = true;
 		attackTimer = attackCooldown;
 		currentAnimName = 'attack';
@@ -794,8 +1115,10 @@ function animate() {
 		});
 	}
 
-	velocity.y += gravity * dt;
-	player.position.y += velocity.y * dt;
+	if (!controlsLocked) {
+		velocity.y += gravity * dt;
+		player.position.y += velocity.y * dt;
+	}
 
 	if (player.position.y <= 0) {
 		player.position.y = 0;
