@@ -11,6 +11,9 @@
     "install:mistral": "node -e \"require('fs').mkdirSync('models/mistral-7b', { recursive: true })\" && uvx --from huggingface_hub hf download mistralai/Mistral-7B-Instruct-v0.3 --local-dir ./models/mistral-7b",
     "docker:s3": "node ./scripts/docker-s3.js",
     "docker:sgl": "node ./scripts/docker-sgl.js",
+    "docker:game-dev": "node ./scripts/docker-game-dev.js",
+    "build-docker:game": "node ./scripts/docker-game-build.js",
+    "docker:game": "node ./scripts/docker-game-run.js",
     "dev:sgl": "python -m sglang.launch_server --model /models/mistral-7b --context-length 32000 --tp 1 --quantization fp8 --kv-cache-dtype fp8_e5m2 --attention-backend triton --chunked-prefill-size 4096 --mem-fraction-static 0.8 --enable-torch-compile --host 0.0.0.0 --port 30000",
     "dev:api": "uv run -- python -m uvicorn livetrivia._api:api --app-dir src --reload --reload-dir src/livetrivia",
     "dev:app": "uv run -- python ./src/livetrivia/_app.py"

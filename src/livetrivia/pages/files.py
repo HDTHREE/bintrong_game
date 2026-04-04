@@ -36,16 +36,14 @@ layout: dmc.AppShellMain = dmc.AppShellMain(
                         w="100%",
                         justify="space-around",
                         children=[
-                            upload := dash.dcc.Upload(
-                                children=dmc.Button(
-                                    dmc.Text(children="Upload File"),
-                                    w="48%",
-                                    leftSection=di.DashIconify(
-                                        icon="ic:round-file-upload"
-                                    ),
+                            dmc.Button(
+                                upload := dash.dcc.Upload(
+                                    children=dmc.Text(children="Upload File"),
+                                    multiple=False,
+                                    accept=",".join(EXTS),
                                 ),
-                                multiple=False,
-                                accept=",".join(EXTS),
+                                w="48%",
+                                leftSection=di.DashIconify(icon="ic:round-file-upload"),
                             ),
                             yt_button := dmc.Button(
                                 children="YouTube",
