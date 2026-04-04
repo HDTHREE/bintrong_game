@@ -1,7 +1,7 @@
 from fastapi import APIRouter, status, UploadFile, File as FormFile
 import uuid
 
-from livetrivia.db import SqlSession, S3Client, BUCKET_NAME
+from livetrivia.db import SqlSession, Storage, BUCKET_NAME
 from livetrivia.models.files import File, FileDataResponse
 from livetrivia.routes.session import CurrentUserId
 from fastapi import HTTPException
@@ -15,7 +15,7 @@ router: APIRouter = APIRouter(prefix="/files", tags=["files"])
 async def upload_file(
     user_id: CurrentUserId,
     sql: SqlSession,
-    s3: S3Client,
+    storage: Storage,
     file: UploadFile = FormFile(...),
 ) -> File:
     id: uuid.UUID = uuid.uuid4()
@@ -23,7 +23,7 @@ async def upload_file(
     prefix: str = f"{user_id}/uploads/{id}/{filename}"
 
     file_content: bytes = await file.read()
-    await s3.put_object(
+    await storage.put_object(
         Bucket=BUCKET_NAME,
         Key=prefix,
         Body=file_content,
@@ -47,7 +47,7 @@ async def download_file(
     file_id: uuid.UUID,
     user_id: CurrentUserId,
     sql: SqlSession,
-    s3: S3Client,
+    storage: Storage,
 ) -> StreamingResponse:
     file = await sql.get(File, file_id)
     if not file:
@@ -58,7 +58,7 @@ async def download_file(
     key = file.prefix
 
     try:
-        resp = await s3.get_object(Bucket=BUCKET_NAME, Key=key)
+        resp = await storage.get_object(Bucket=BUCKET_NAME, Key=key)
     except Exception:
         raise HTTPException(status_code=404, detail="object not found in storage")
 
@@ -86,7 +86,7 @@ async def delete_file(
     file_id: uuid.UUID,
     user_id: CurrentUserId,
     sql: SqlSession,
-    s3: S3Client,
+    storage: Storage,
 ) -> None:
     file = await sql.get(File, file_id)
     if not file:
@@ -97,7 +97,7 @@ async def delete_file(
     key: str = file.prefix
 
     try:
-        await s3.delete_object(Bucket=BUCKET_NAME, Key=key)
+        await storage.delete_object(Bucket=BUCKET_NAME, Key=key)
     except Exception:
         raise HTTPException(status_code=500, detail="failed to delete from storage")
 

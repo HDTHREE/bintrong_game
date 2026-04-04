@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict
 from sqlmodel import select
 
-from livetrivia.db import BUCKET_NAME, S3Client, SqlSession
+from livetrivia.db import BUCKET_NAME, Storage, SqlSession
 from livetrivia.models.anki_deck import (
     GeneratedFlashcard,
     build_anki_package,
@@ -96,7 +96,7 @@ async def get_gen_text(
     request: YouTubeBody | FileBody,
     user_id: CurrentUserId,
     yt: YTApi,
-    s3: S3Client,
+    s3: Storage,
     sql: SqlSession,
 ) -> str:
     if request.file_id is not None:
@@ -228,7 +228,7 @@ async def generate_anki(
     text: GenText,
     user_id: CurrentUserId,
     sql: SqlSession,
-    s3: S3Client,
+    s3: Storage,
     gen: GenApi,
 ) -> File:
     chunks = tuple(text[i : i + CHUNK_SIZE] for i in range(0, len(text), CHUNK_SIZE))

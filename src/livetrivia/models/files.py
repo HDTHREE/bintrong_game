@@ -23,6 +23,17 @@ class File(SQLModel, table=True):
     """Related entry: User that owns this file"""
 
 
+class FileBlob(SQLModel, table=True):
+    """Table for storing raw file binary in postgres. Used as an S3 replacement in production."""
+
+    prefix: str = Field(primary_key=True)
+    """Primary key column: Object key mirroring the S3 key / file prefix."""
+    content_type: str = Field(default="application/octet-stream")
+    """Column: MIME type of the stored object."""
+    data: bytes = Field(sa_column_kwargs={"nullable": False})
+    """Column: Raw binary content of the file."""
+
+
 class FileDataResponse(BaseModel):
     """Response model for returning information about an uploaded file."""
 

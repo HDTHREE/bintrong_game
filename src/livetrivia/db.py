@@ -5,6 +5,7 @@ import typing_extensions as tp
 import sqlalchemy.ext.asyncio as sqlas
 import sqlalchemy.orm as sqlorm
 from livetrivia.utils import getenvs
+from livetrivia.storage import StorageClient
 from fastapi import Depends
 import logging
 
@@ -19,6 +20,11 @@ logger: logging.Logger = logging.Logger(__name__)
 
 SQL_URL, S3_URL, S3_REGION, BUCKET_NAME = getenvs(logger=logger)
 """Enivronment variables for database and S3 configuration."""
+
+_USE_POSTGRES: bool = "postgresql" in SQL_URL
+
+if not _USE_POSTGRES and S3_URL is None:
+    raise RuntimeError("Cannot start livetrivia backend with current data storage configuration.")
 
 
 async def get_sql_engine(
@@ -68,21 +74,46 @@ async def get_s3_client(
         yield s3
 
 
+async def get_storage(
+    async_engine: sqlas.AsyncEngine = Depends(get_sql_engine),
+) -> tp.AsyncGenerator[StorageClient]:
+    """Dependency that yields a :class:`~livetrivia.storage.StorageClient`.
+
+    Yields a DB-backed instance when running against PostgreSQL, or an S3-backed
+    instance (via LocalStack) when running in development.
+    """
+    if _USE_POSTGRES:
+        yield StorageClient(sql_engine=async_engine)
+        return
+
+    aws_session = aioboto3.Session()
+    aws_access_key_id, aws_secret_access_key = ("test", "test")
+    async with aws_session.client(
+        "s3",
+        endpoint_url=S3_URL,
+        region_name=S3_REGION,
+        aws_access_key_id=aws_access_key_id,
+        aws_secret_access_key=aws_secret_access_key,
+    ) as s3:
+        yield StorageClient(s3=s3)
+
+
 @cl.asynccontextmanager
 async def lifespan(_: "FastAPI") -> tp.AsyncGenerator[None, None]:
     """FastAPI lifespan. Used to set up type ORM and creating the named bucket."""
-    get_s3_session_context: cl.AbstractAsyncContextManager = cl.asynccontextmanager(
-        get_s3_session
-    )
-    get_s3_client_context: cl.AbstractAsyncContextManager = cl.asynccontextmanager(
-        get_s3_client
-    )
+    if not _USE_POSTGRES:
+        get_s3_session_context: cl.AbstractAsyncContextManager = cl.asynccontextmanager(
+            get_s3_session
+        )
+        get_s3_client_context: cl.AbstractAsyncContextManager = cl.asynccontextmanager(
+            get_s3_client
+        )
 
-    async with (
-        get_s3_session_context() as aws_session,
-        get_s3_client_context(S3_URL, S3_REGION, aws_session) as s3,
-    ):
-        await s3.create_bucket(Bucket=BUCKET_NAME)
+        async with (
+            get_s3_session_context() as aws_session,
+            get_s3_client_context(S3_URL, S3_REGION, aws_session) as s3,
+        ):
+            await s3.create_bucket(Bucket=BUCKET_NAME)
 
     get_sql_engine_context: cl.AbstractAsyncContextManager = cl.asynccontextmanager(
         get_sql_engine
@@ -100,3 +131,6 @@ SqlSession: tp.TypeAlias = tp.Annotated[sqlas.AsyncSession, Depends(get_sql_sess
 
 S3Client: tp.TypeAlias = tp.Annotated["aiob3t.S3Client", Depends(get_s3_client)]
 """Aioboto3 S3 Client dependency type alias. Provides an injected dependency for S3 operations."""
+
+Storage: tp.TypeAlias = tp.Annotated[StorageClient, Depends(get_storage)]
+"""Unified storage dependency. Uses PostgreSQL in production, S3/LocalStack in development."""
