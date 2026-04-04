@@ -36,7 +36,6 @@ services:
       ACCESS_TOKEN_EXPIRE_MINUTES: "30"
       REFRESH_TOKEN_EXPIRE_DAYS: "7"
       SGLANG_URL: http://sglang:30000/
-      # S3 vars are required by getenvs at import time; storage auto-uses postgres when SQL_URL contains "postgresql"
       S3_URL: http://unused/
       S3_REGION: us-east-1
       BUCKET_NAME: unused
