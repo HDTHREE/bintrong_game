@@ -130,15 +130,12 @@ async def update_files_grid(_: dict, token: dict):
     """Callback triggered when user data changes. Fetches all files for the user."""
     if not token or not token.get("access_token"):
         return []
-    access_token = token["access_token"]
-    headers = {"Authorization": f"Bearer {access_token}"}
-    async with (
-        aiohttp.ClientSession(BACKEND_URL) as session,
-        session.get("api/files/data/", headers=headers) as resp,
-    ):
-        if resp.status != 200:
-            return []
-        return await resp.json()
+    headers = {"Authorization": f"Bearer {token['access_token']}"}
+    try:
+        async with aiohttp.ClientSession(BACKEND_URL) as session:
+            return await _get_files_data(session, headers)
+    except de.PreventUpdate:
+        return []
 
 
 @app.callback(
@@ -202,6 +199,7 @@ async def _get_files_data(session: aiohttp.ClientSession, headers: dict) -> list
     async with session.get("api/files/data/", headers=headers) as resp:
         if resp.status != 200:
             raise de.PreventUpdate()
+        print(await resp.json())
         return await resp.json()
 
 
