@@ -21,6 +21,7 @@ services:
     build:
       context: .
       dockerfile: api.Dockerfile
+    image: livetrivia-api:latest
     container_name: livetrivia_api
     restart: unless-stopped
     depends_on:
@@ -78,6 +79,7 @@ services:
     build:
       context: .
       dockerfile: app.Dockerfile
+    image: livetrivia-app:latest
     container_name: livetrivia_app
     restart: unless-stopped
     depends_on:

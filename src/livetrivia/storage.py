@@ -9,7 +9,6 @@ The environment is inferred from the SQL connection URL: if it contains
 ``"postgresql"`` the class uses the DB backend; otherwise it uses S3.
 """
 
-from __future__ import annotations
 
 import typing_extensions as tp
 import sqlalchemy.ext.asyncio as sqlas
@@ -36,6 +35,7 @@ class _BodyStream:
         self._pos = 0
 
     async def read(self, size: int = -1) -> bytes:
+        """Read `size` bytes from the buffer."""
         if size == -1:
             chunk = self._data[self._pos :]
             self._pos = len(self._data)
@@ -63,7 +63,7 @@ class StorageClient:
     """
 
     def __init__(
-        self,
+        self: tp.Self,
         *,
         s3: "aiob3t.S3Client | None" = None,
         sql_engine: sqlas.AsyncEngine | None = None,
@@ -73,12 +73,8 @@ class StorageClient:
         self._s3 = s3
         self._engine = sql_engine
 
-    # ------------------------------------------------------------------
-    # Public interface
-    # ------------------------------------------------------------------
-
     async def put_object(
-        self,
+        self: tp.Self,
         *,
         Bucket: str,  # noqa: N803 – keeps S3 naming parity
         Key: str,  # noqa: N803
@@ -103,7 +99,7 @@ class StorageClient:
             await session.commit()
 
     async def get_object(
-        self,
+        self: tp.Self,
         *,
         Bucket: str,  # noqa: N803
         Key: str,  # noqa: N803
@@ -131,7 +127,7 @@ class StorageClient:
         )
 
     async def delete_object(
-        self,
+        self: tp.Self,
         *,
         Bucket: str,  # noqa: N803
         Key: str,  # noqa: N803
@@ -147,11 +143,7 @@ class StorageClient:
                 await session.delete(blob)
                 await session.commit()
 
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
-
-    def _make_session(self) -> sqlas.AsyncSession:
+    def _make_session(self: tp.Self) -> sqlas.AsyncSession:
         assert self._engine is not None
         factory: sqlorm.Session = sqlorm.sessionmaker(
             bind=self._engine,
