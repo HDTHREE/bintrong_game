@@ -92,6 +92,53 @@ async def get_gen_api(url: str = Depends(lambda: SGLANG_URL)):
         await session.close()
 
 
+async def _fetch_or_store_transcript(
+    video_id: str,
+    user_id: uuid.UUID,
+    yt: YTApi,
+    s3: Storage,
+    sql: SqlSession,
+) -> tuple[File, str]:
+    script_prefix = f"{user_id}/scripts/{video_id}/transcript.json"
+
+    existing_file = (
+        await sql.execute(select(File).where(File.prefix == script_prefix))
+    ).scalar_one_or_none()
+
+    if existing_file is not None:
+        try:
+            resp = await s3.get_object(Bucket=BUCKET_NAME, Key=script_prefix)
+            text = (await resp["Body"].read()).decode("utf-8")
+            return existing_file, text
+        except (BotoCoreError, ClientError, UnicodeDecodeError):
+            pass
+
+    video = yt.fetch(video_id)
+    data = video.to_raw_data()
+    text = "\n".join(d.get("text", "") for d in data).strip()
+
+    await s3.put_object(
+        Bucket=BUCKET_NAME,
+        Key=script_prefix,
+        Body=text.encode("utf-8"),
+        ContentType="application/json",
+    )
+
+    if existing_file is not None:
+        return existing_file, text
+
+    script_file = File(
+        id=uuid.uuid4(),
+        prefix=script_prefix,
+        user_id=user_id,
+        generated_from_id=None,
+    )
+    sql.add(script_file)
+    await sql.commit()
+    await sql.refresh(script_file)
+    return script_file, text
+
+
 async def get_gen_text(
     request: YouTubeBody | FileBody,
     user_id: CurrentUserId,
@@ -121,50 +168,14 @@ async def get_gen_text(
         return get_text(file_bytes)
 
     *_, video_id = request.video.strip().split(YOUTUBE_VIDEO_PREFIX)
-    script_prefix = f"{user_id}/scripts/{video_id}/transcript.json"
-
-    existing_file = (
-        await sql.execute(select(File).where(File.prefix == script_prefix))
-    ).scalar_one_or_none()
-
-    if existing_file is not None:
-        try:
-            resp = await s3.get_object(Bucket=BUCKET_NAME, Key=script_prefix)
-            text = (await resp["Body"].read()).decode("utf-8")
-            request.file_id = existing_file.id
-        except (BotoCoreError, ClientError, UnicodeDecodeError):
-            pass
-        else:
-            return text
-
-    video = yt.fetch(video_id)
-    data = video.to_raw_data()
-    text = "\n".join(d.get("text", "") for d in data).strip()
-
-    script_file = File(
-        id=uuid.uuid4(),
-        prefix=script_prefix,
-        user_id=user_id,
-        generated_from_id=None,
-    )
-
-    await s3.put_object(
-        Bucket=BUCKET_NAME,
-        Key=script_prefix,
-        Body=text.encode("utf-8"),
-        ContentType="application/json",
-    )
-
-    if existing_file is not None:
-        return text
-
-    sql.add(script_file)
-    await sql.commit()
-    await sql.refresh(script_file)
+    file, text = await _fetch_or_store_transcript(video_id, user_id, yt, s3, sql)
+    request.file_id = file.id
     return text
 
 
 GenApi: tp.TypeAlias = tp.Annotated[aiohttp.ClientSession, Depends(get_gen_api)]
+
+
 GenText: tp.TypeAlias = tp.Annotated[str, Depends(get_gen_text)]
 
 
@@ -222,6 +233,23 @@ async def generate_partial(gen: GenApi, prompt: str, chunk: str) -> GeneratedFla
     )
 
 
+@router.post(
+    "/fetch-transcript",
+    response_model=FileDataResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def fetch_transcript(
+    request: YouTubeBody,
+    user_id: CurrentUserId,
+    yt: YTApi,
+    s3: Storage,
+    sql: SqlSession,
+) -> File:
+    *_, video_id = request.video.strip().split(YOUTUBE_VIDEO_PREFIX)
+    file, _ = await _fetch_or_store_transcript(video_id, user_id, yt, s3, sql)
+    return file
+
+
 @router.post("/", response_model=FileDataResponse, status_code=status.HTTP_201_CREATED)
 async def generate_anki(
     request: YouTubeBody | FileBody,
@@ -257,17 +285,6 @@ async def generate_anki(
         Body=package_bytes,
         ContentType="application/zip",
     )
-
-    if request.file_id is None:
-        *_, video_id = request.video.strip().split(YOUTUBE_VIDEO_PREFIX)
-        script_prefix = f"{user_id}/scripts/{video_id}/transcript.json"
-        if (
-            script := (
-                await sql.execute(select(File).where(File.prefix == script_prefix))
-            ).scalar_one_or_none()
-        ) is None:
-            raise HTTPException(404)
-        request.file_id = script.id
 
     new_file = File(
         id=file_id,

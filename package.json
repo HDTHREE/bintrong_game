@@ -19,7 +19,7 @@
     "build-docker:app": "node ./scripts/docker-app-build.js",
     "docker:app": "node ./scripts/docker-app-run.js",
     "dev:sgl": "python -m sglang.launch_server --model /models/mistral-7b --context-length 32000 --tp 1 --quantization fp8 --kv-cache-dtype fp8_e5m2 --attention-backend triton --chunked-prefill-size 4096 --mem-fraction-static 0.8 --enable-torch-compile --host 0.0.0.0 --port 30000",
-    "dev:api": "uv run -- python -m uvicorn livetrivia._api:api --app-dir src --reload --reload-dir src/livetrivia",
+    "dev:api": "uv run -- python -m uvicorn livetrivia._api:api --app-dir src",
     "dev:app": "uv run -- python ./src/livetrivia/_app.py"
   },
   "author": "HDTHREE",

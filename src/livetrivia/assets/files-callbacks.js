@@ -1,6 +1,10 @@
 globalThis.dash_clientside = { // eslint-disable-line camelcase
 	...globalThis.dash_clientside, files: {
 		openUpload: _ => document.querySelector('input[type="file"]').click(),
+		updateStateSubmit: value => !value,
+		openYouTubeModal: _ => true,
+		closeYouTubeModal: _ => false,
+
 	},
 };
 

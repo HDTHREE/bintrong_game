@@ -45,7 +45,7 @@ layout: dmc.AppShellMain = dmc.AppShellMain(
                                 w="48%",
                                 leftSection=di.DashIconify(icon="ic:round-file-upload"),
                             ),
-                            yt_button := dmc.Button(
+                            youtube_button := dmc.Button(
                                 children="YouTube",
                                 color="red",
                                 w="48%",
@@ -97,8 +97,16 @@ layout: dmc.AppShellMain = dmc.AppShellMain(
                         },
                     ),
                     download := dash.dcc.Download(),
-                    modal := dmc.Modal(
-                        modal_fieldset := dmc.Fieldset(), keepMounted=True
+                    youtube_modal := dmc.Modal(
+                        dmc.Fieldset(
+                            children=[
+                                dmc.Title("YouTube transcript"),
+                                dmc.Text(size="xs", children="This video's transcript will be made available as a file."),
+                                youtube_text_input := dmc.TextInput(placeholder="https://www.youtube.com/watch?v=...", label="URL", required=True),
+                                dmc.Space(h=5),
+                                youtube_modal_submit_button := dmc.Button(children="Submit"),
+                            ]
+                        ), keepMounted=True,
                     ),
                 ]
             ),
@@ -189,6 +197,14 @@ async def handle_file_action(
             return data, download_data
 
 
+async def _get_files_data(session: aiohttp.ClientSession, headers: dict) -> list:
+    """Fetch the current list of files from the backend API."""
+    async with session.get("api/files/data/", headers=headers) as resp:
+        if resp.status != 200:
+            raise de.PreventUpdate()
+        return await resp.json()
+
+
 @app.callback(
     dash.Output(grid, "rowData", allow_duplicate=True),
     dash.Input(upload, "contents"),
@@ -205,22 +221,41 @@ async def upload_file(contents: str, filename: str, token: dict):
     access_token: str = token["access_token"]
     headers = {"Authorization": f"Bearer {access_token}"}
     async with aiohttp.ClientSession(BACKEND_URL) as session:
-        data: aiohttp.FormData = aiohttp.FormData(
-            fields={
-                "name": "file",
-                "value": file_bytes,
-                "filename": filename,
-                "content_type": "application/octet-stream",
-            }
+        (data := aiohttp.FormData()).add_field(
+            "file",
+            file_bytes,
+            filename=filename,
+            content_type="application/octet-stream",
         )
         async with session.post("api/files/", data=data, headers=headers) as resp:
             if resp.status != 201:
                 raise de.PreventUpdate()
-        async with session.get("api/files/data/", headers=headers) as resp:
+        return await _get_files_data(session, headers)
+
+
+@app.callback(
+    dash.Output(grid, "rowData", allow_duplicate=True),
+    dash.Input(youtube_modal_submit_button, "n_clicks"),
+    dash.State(youtube_text_input, "value"),
+    dash.State(token_store, "data"),
+    prevent_initial_call=True,
+)
+async def get_youtube_transcript(_: int, youtube_text_input_value: str | None, token: dict):
+    """Callback triggered when user submits a YouTube URL. Fetches the transcript via the backend."""
+    if not youtube_text_input_value or not token or not token.get("access_token"):
+        raise de.PreventUpdate()
+    access_token: str = token["access_token"]
+    headers = {"Authorization": f"Bearer {access_token}"}
+    async with aiohttp.ClientSession(BACKEND_URL) as session:
+        async with session.post(
+            "api/generate/fetch-transcript",
+            json={"video": youtube_text_input_value},
+            headers=headers,
+        ) as resp:
             if resp.status != 200:
                 raise de.PreventUpdate()
-            return await resp.json()
-
+        return await _get_files_data(session, headers)
+    
 
 open_upload: ClientsideFunctionType = app.clientside_callback(
     dash.ClientsideFunction("files", "openUpload"),
@@ -228,6 +263,33 @@ open_upload: ClientsideFunctionType = app.clientside_callback(
     prevent_initial_call=True,
 )
 """Callback that opens the upload component. Part of the button isn't in the upload."""
+
+
+update_state_submit: ClientsideFunctionType = app.clientside_callback(
+    dash.ClientsideFunction("files", "updateStateSubmit"),
+    dash.Output(youtube_modal_submit_button, "disabled"),
+    dash.Input(youtube_text_input, "value"),
+)
+"""Callback to update the disabled/enabled state of the submit button on the youtube fetch moddal."""
+
+
+open_youtube_modal: ClientsideFunctionType = app.clientside_callback(
+
+    dash.ClientsideFunction("files", "openYouTubeModal"),
+    dash.Output(youtube_modal, "opened", allow_duplicate=True),
+    dash.Input(youtube_button, "n_clicks"),
+    prevent_initial_call=True,
+)
+"""Callback to open the modal when the YouTube button is clicked."""
+
+
+close_youtube_modal: ClientsideFunctionType = app.clientside_callback(
+    dash.ClientsideFunction("files", "closeYouTubeModal"),
+    dash.Output(youtube_modal, "opened", allow_duplicate=True),
+    dash.Input(youtube_modal_submit_button, "n_clicks"),
+    prevent_initial_call=True,
+)
+"""Callback to close the modal when the submit button is clicked."""
 
 
 dash.register_page(
