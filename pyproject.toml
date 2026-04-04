@@ -16,10 +16,12 @@ dependencies = [
 backend = [
     "fastapi>=0.121.1",
     "gunicorn>=23.0.0",
+    "uvicorn>=0.38.0",
     "sqlalchemy[asyncio]>=2.0.44",
     "pypdf>=6.2.0",
     "youtube-transcript-api>=1.2.3",
     "python-multipart>=0.0.21",
+    "asyncpg>=0.29.0",
     "aiosqlite>=0.22.1",
     "bcrypt>=5.0.0",
     "pydantic[email]>=2.12.4",
@@ -35,6 +37,7 @@ frontend = [
     "dash-mantine-components>=2.4.0",
     "dash[async]>=3.3.0",
     "gunicorn>=23.0.0",
+    "pydantic[email]>=2.12.4",
 ]
 dev = [
     "ruff>=0.14.5",
@@ -48,7 +51,7 @@ sglang = [
 ]
 
 [build-system]
-requires = ["uv_build>=0.10.0,<0.11.0"]
+requires = ["uv_build>=0.10.0"]
 build-backend = "uv_build"
 
 [tool.uv.pip]

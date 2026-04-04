@@ -17,7 +17,7 @@ const tsconfigServerPath = toUnixPath('tsconfig.server.json');
 
 const buildResult = spawnSync(
 	'docker',
-	['build', '--target', 'development', '-t', 'livetrivia-game-dev:latest', '.'],
+	['build', '--file', 'game.Dockerfile', '--target', 'development', '-t', 'livetrivia-game-dev:latest', '.'],
 	{stdio: 'inherit'},
 );
 

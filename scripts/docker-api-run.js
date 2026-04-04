@@ -3,15 +3,16 @@
 import {spawnSync} from 'node:child_process';
 import process from 'node:process';
 
+spawnSync('docker', ['rm', '-f', 'livetrivia-api'], {stdio: 'inherit'});
+
 const args = [
-	'build',
-	'--file',
-	'game.Dockerfile',
-	'--target',
-	'runtime',
-	'-t',
-	'livetrivia-game:latest',
-	'.',
+	'run',
+	'--rm',
+	'--name',
+	'livetrivia-api',
+	'-p',
+	'8000:8000',
+	'livetrivia-api:latest',
 ];
 
 const result = spawnSync('docker', args, {stdio: 'inherit'});

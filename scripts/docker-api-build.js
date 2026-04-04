@@ -6,11 +6,9 @@ import process from 'node:process';
 const args = [
 	'build',
 	'--file',
-	'game.Dockerfile',
-	'--target',
-	'runtime',
+	'api.Dockerfile',
 	'-t',
-	'livetrivia-game:latest',
+	'livetrivia-api:latest',
 	'.',
 ];
 

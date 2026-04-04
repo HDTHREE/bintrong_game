@@ -1,7 +1,8 @@
 from sqlmodel import Field, SQLModel, Relationship
+from sqlalchemy import Column, DateTime
 from pydantic import computed_field
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 import typing_extensions as tp
 
 if tp.TYPE_CHECKING:
@@ -24,12 +25,15 @@ class Session(SQLModel, table=True):
     is_active: bool = Field(default=True)
     """Column: Status to enable/disable this session's permissions."""
 
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column=Column(DateTime(timezone=True)),
+    )
     """Column: Issue time of session."""
 
-    access_token_expires_at: datetime
+    access_token_expires_at: datetime = Field(sa_column=Column(DateTime(timezone=True)))
     """Column: Expire time of access token."""
-    refresh_token_expires_at: datetime
+    refresh_token_expires_at: datetime = Field(sa_column=Column(DateTime(timezone=True)))
     """Column: Expire time of refresh token."""
 
     user: "User" = Relationship(back_populates="sessions")

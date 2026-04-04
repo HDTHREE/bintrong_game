@@ -120,9 +120,10 @@ async def lifespan(_: "FastAPI") -> tp.AsyncGenerator[None, None]:
     )
     engine: sqlas.AsyncEngine
     connection: sqlas.AsyncConnection
-    async with get_sql_engine_context(SQL_URL) as engine, engine.begin() as connection:
-        await connection.run_sync(SQLModel.metadata.create_all)
-        yield
+    async with get_sql_engine_context(SQL_URL) as engine:
+        async with engine.begin() as connection:
+            await connection.run_sync(SQLModel.metadata.create_all)
+    yield
 
 
 SqlSession: tp.TypeAlias = tp.Annotated[sqlas.AsyncSession, Depends(get_sql_session)]

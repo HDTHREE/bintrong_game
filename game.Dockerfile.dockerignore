@@ -1,0 +1,17 @@
+node_modules
+dist
+dist-server
+.venv
+src/livetrivia
+**/*.py
+pyproject.toml
+uv.lock
+models
+poster
+tests
+questions.apkg
+*.apkg
+*.md
+docker-compose.yml
+lt
+scripts
