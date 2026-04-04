@@ -199,7 +199,6 @@ async def _get_files_data(session: aiohttp.ClientSession, headers: dict) -> list
     async with session.get("api/files/data/", headers=headers) as resp:
         if resp.status != 200:
             raise de.PreventUpdate()
-        print(await resp.json())
         return await resp.json()
 
 
