@@ -16,7 +16,7 @@
     input[type='checkbox'] { cursor: pointer; }
     button { background: #0a4; color: #fff; border: none; padding: 3px 12px; cursor: pointer; border-radius: 2px; }
     button:hover { background: #0c5; }
-    #restart-btn { margin-bottom: .5rem; }
+    #controls { display: flex; gap: .5rem; align-items: center; margin-bottom: .5rem; flex-wrap: wrap; }
     .id-cell { color: #888; font-size: .8em; max-width: 130px; overflow: hidden; text-overflow: ellipsis; }
     #status  { margin-top: .5rem; min-height: 1.2em; color: #0f0; font-size: .85em; }
   </style>
@@ -24,7 +24,16 @@
 <body>
   <h1>Player State Debug</h1>
   <p>Auto-refreshes every 2&nbsp;s. Editing a row pauses its refresh until you click Apply.</p>
-  <button id="restart-btn" type="button">Restart Game</button>
+  <div id="controls">
+    <button id="restart-btn" type="button">Restart Game</button>
+    <select id="spawn-kind" aria-label="Obstacle kind">
+      <option value="random" selected>Random Obstacle</option>
+      <option value="cone">Cone</option>
+      <option value="box">Box</option>
+      <option value="barrel">Oil Barrel</option>
+    </select>
+    <button id="spawn-obstacle-btn" type="button">Spawn Obstacle</button>
+  </div>
   <div id="status"></div>
   <table>
     <thead><tr>
@@ -147,6 +156,22 @@
       }
     }
 
+    async function spawnObstacle() {
+      const kindSelect = document.getElementById('spawn-kind');
+      const kind = kindSelect ? kindSelect.value : 'random';
+      const res = await fetch('/debug/spawn-obstacle', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({kind}),
+      });
+
+      if (res.ok) {
+        statusEl.textContent = 'Spawned ' + kind + ' obstacle at ' + new Date().toLocaleTimeString();
+      } else {
+        statusEl.textContent = 'Failed to spawn obstacle (' + res.status + ')';
+      }
+    }
+
     async function refresh() {
       let players;
       try {
@@ -167,6 +192,10 @@
 
     document.getElementById('restart-btn').addEventListener('click', () => {
       void restartGame();
+    });
+
+    document.getElementById('spawn-obstacle-btn').addEventListener('click', () => {
+      void spawnObstacle();
     });
 
     refresh();

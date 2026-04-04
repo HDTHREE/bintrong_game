@@ -51,6 +51,24 @@ type RoundState = {
 	zones: AnswerZone[];
 };
 
+type ObstacleKind = 'cone' | 'box' | 'barrel';
+
+type ObstacleState = {
+	id: string;
+	kind: ObstacleKind;
+	modelFile: string;
+	x: number;
+	y: number;
+	z: number;
+	rotationY: number;
+	radius: number;
+	height: number;
+	dynamic: boolean;
+	velocityY: number;
+	velocityX: number;
+	velocityZ: number;
+};
+
 type AnkiCollectionLike = {
 	getDecks: () => Record<string, {
 		getCards: () => Record<string, {
@@ -83,6 +101,31 @@ const broadcastIntervalMs = 200;
 const zoneRadius = 1.9;
 const platformHalfBound = 7.5;
 const answerZoneSpawnBound = 6.8;
+const playerRadius = 0.35;
+const maxPermanentObstacles = 5;
+const obstacleSpawnBound = 6.6;
+const barrelSpeed = 3.6;
+const barrelDespawnPadding = 1.2;
+const obstacleSpawnHeight = 10;
+const obstacleFallGravity = -28;
+
+const obstacleModelFiles: Record<ObstacleKind, string> = {
+	cone: 'traffic_cone.glb',
+	box: 'free_low_poly_crate.glb',
+	barrel: 'simple_oil_barrel.glb',
+};
+
+const obstacleRadii: Record<ObstacleKind, number> = {
+	cone: 0.45,
+	box: 0.8,
+	barrel: 0.75,
+};
+
+const obstacleHeights: Record<ObstacleKind, number> = {
+	cone: 1.1,
+	box: 0.88,
+	barrel: 1.25,
+};
 
 let triviaCards: TriviaCard[] = [];
 let triviaCursor = 0;
@@ -91,6 +134,8 @@ let phaseEndsAt = 0;
 let lastStateBroadcastAt = 0;
 let awaitingHostDecision = false;
 let hostDecisionKind: 'initial' | 'replay' = 'initial';
+let nextObstacleId = 1;
+const obstacles = new Map<string, ObstacleState>();
 
 let roundState: RoundState = {
 	phase: 'waiting',
@@ -190,6 +235,14 @@ function setWaitingState(message: string) {
 		revealedAnswerCount: 0,
 		zones: [],
 	};
+}
+
+function serializeObstacles(): ObstacleState[] {
+	return [...obstacles.values()];
+}
+
+function broadcastObstaclesState() {
+	io.emit('obstaclesState', serializeObstacles());
 }
 
 function broadcastRoundState(force = false) {
@@ -309,6 +362,322 @@ function ensureHostAssigned() {
 	io.emit('playerMoved', nextHost);
 }
 
+function clampToPlatform(value: number): number {
+	return Math.max(-platformHalfBound, Math.min(platformHalfBound, value));
+}
+
+function countPermanentObstacles(): number {
+	let count = 0;
+	for (const obstacle of obstacles.values()) {
+		if (!obstacle.dynamic) {
+			count++;
+		}
+	}
+
+	return count;
+}
+
+function findObstacleSpawnPosition(radius: number): {x: number; z: number} {
+	const maxAttempts = 180;
+	for (let attempt = 0; attempt < maxAttempts; attempt++) {
+		const candidateX = (Math.random() * 2 - 1) * obstacleSpawnBound;
+		const candidateZ = (Math.random() * 2 - 1) * obstacleSpawnBound;
+
+		const overlapsObstacle = [...obstacles.values()].some(obstacle => {
+			const dx = candidateX - obstacle.x;
+			const dz = candidateZ - obstacle.z;
+			return Math.hypot(dx, dz) < radius + obstacle.radius + 0.35;
+		});
+		if (overlapsObstacle) {
+			continue;
+		}
+
+		const overlapsPlayer = [...players.values()].some(player => {
+			const dx = candidateX - player.x;
+			const dz = candidateZ - player.z;
+			return Math.hypot(dx, dz) < radius + playerRadius + 0.55;
+		});
+		if (overlapsPlayer) {
+			continue;
+		}
+
+		return {x: candidateX, z: candidateZ};
+	}
+
+	return {
+		x: (Math.random() * 2 - 1) * (obstacleSpawnBound * 0.7),
+		z: (Math.random() * 2 - 1) * (obstacleSpawnBound * 0.7),
+	};
+}
+
+function spawnPermanentObstacle(kind: 'cone' | 'box') {
+	if (countPermanentObstacles() >= maxPermanentObstacles) {
+		return;
+	}
+
+	const radius = obstacleRadii[kind];
+	const spawn = findObstacleSpawnPosition(radius);
+	const obstacle: ObstacleState = {
+		id: `obs-${nextObstacleId++}`,
+		kind,
+		modelFile: obstacleModelFiles[kind],
+		x: spawn.x,
+		y: obstacleSpawnHeight,
+		z: spawn.z,
+		rotationY: Math.random() * Math.PI * 2,
+		radius,
+		height: obstacleHeights[kind],
+		dynamic: false,
+		velocityY: 0,
+		velocityX: 0,
+		velocityZ: 0,
+	};
+	obstacles.set(obstacle.id, obstacle);
+	broadcastObstaclesState();
+}
+
+function spawnRollingBarrel() {
+	const kind: ObstacleKind = 'barrel';
+	const radius = obstacleRadii[kind];
+	const spawn = findObstacleSpawnPosition(radius);
+	const directionAngle = Math.random() * Math.PI * 2;
+	const velocityX = Math.sin(directionAngle) * barrelSpeed;
+	const velocityZ = Math.cos(directionAngle) * barrelSpeed;
+	const obstacle: ObstacleState = {
+		id: `obs-${nextObstacleId++}`,
+		kind,
+		modelFile: obstacleModelFiles[kind],
+		x: spawn.x,
+		y: obstacleSpawnHeight,
+		z: spawn.z,
+		rotationY: directionAngle,
+		radius,
+		height: obstacleHeights[kind],
+		dynamic: true,
+		velocityY: 0,
+		velocityX,
+		velocityZ,
+	};
+	obstacles.set(obstacle.id, obstacle);
+	broadcastObstaclesState();
+}
+
+function spawnObstacleAtRoundEnd(roundNumber: number) {
+	if (countPermanentObstacles() >= maxPermanentObstacles) {
+		spawnRollingBarrel();
+		return;
+	}
+
+	if (roundNumber % 5 !== 0) {
+		return;
+	}
+
+	const pick = Math.floor(Math.random() * 3);
+	if (pick === 0) {
+		spawnPermanentObstacle('cone');
+		return;
+	}
+
+	if (pick === 1) {
+		spawnPermanentObstacle('box');
+		return;
+	}
+
+	spawnRollingBarrel();
+}
+
+function spawnObstacleByKind(kind: ObstacleKind | 'random'): void {
+	if (kind === 'cone' || kind === 'box') {
+		spawnPermanentObstacle(kind);
+		return;
+	}
+
+	if (kind === 'barrel') {
+		spawnRollingBarrel();
+		return;
+	}
+
+	if (countPermanentObstacles() >= maxPermanentObstacles) {
+		spawnRollingBarrel();
+		return;
+	}
+
+	const roll = Math.floor(Math.random() * 3);
+	if (roll === 0) {
+		spawnPermanentObstacle('cone');
+		return;
+	}
+
+	if (roll === 1) {
+		spawnPermanentObstacle('box');
+		return;
+	}
+
+	spawnRollingBarrel();
+}
+
+function applyObstacleCollisions(player: PlayerState, includeDynamic: boolean): boolean {
+	let changed = false;
+
+	for (const obstacle of obstacles.values()) {
+		if (!includeDynamic && obstacle.dynamic) {
+			continue;
+		}
+
+		if (obstacle.y > 0.01) {
+			continue;
+		}
+
+		if (obstacle.kind === 'box') {
+			const topY = obstacle.y + obstacle.height;
+			const boxHalf = obstacle.radius;
+			const expandedHalf = boxHalf + playerRadius;
+			const localX = player.x - obstacle.x;
+			const localZ = player.z - obstacle.z;
+			const insideExpanded = Math.abs(localX) < expandedHalf && Math.abs(localZ) < expandedHalf;
+			if (!insideExpanded) {
+				continue;
+			}
+
+			const isOnTop
+				= player.y >= topY - 0.12
+					&& Math.abs(localX) <= boxHalf - 0.02
+					&& Math.abs(localZ) <= boxHalf - 0.02;
+			if (isOnTop) {
+				continue;
+			}
+
+			const penetrationX = expandedHalf - Math.abs(localX);
+			const penetrationZ = expandedHalf - Math.abs(localZ);
+			if (penetrationX <= penetrationZ) {
+				const directionX = localX === 0 ? (Math.random() < 0.5 ? -1 : 1) : Math.sign(localX);
+				player.x += directionX * penetrationX;
+			} else {
+				const directionZ = localZ === 0 ? (Math.random() < 0.5 ? -1 : 1) : Math.sign(localZ);
+				player.z += directionZ * penetrationZ;
+			}
+
+			changed = true;
+			continue;
+		}
+
+		if (obstacle.kind === 'barrel') {
+			const barrelTop = obstacle.y + obstacle.radius * 2;
+			const aboveBarrelTop = player.y >= barrelTop - 0.02;
+			if (aboveBarrelTop) {
+				continue;
+			}
+
+			const axisX = Math.cos(obstacle.rotationY);
+			const axisZ = -Math.sin(obstacle.rotationY);
+			const halfLength = obstacle.height * 0.5;
+			const dx = player.x - obstacle.x;
+			const dz = player.z - obstacle.z;
+			const along = dx * axisX + dz * axisZ;
+			const clampedAlong = Math.max(-halfLength, Math.min(halfLength, along));
+			const nearestX = obstacle.x + axisX * clampedAlong;
+			const nearestZ = obstacle.z + axisZ * clampedAlong;
+			const offsetX = player.x - nearestX;
+			const offsetZ = player.z - nearestZ;
+			const radialDistance = Math.hypot(offsetX, offsetZ);
+			const minDistance = playerRadius + obstacle.radius;
+			if (radialDistance >= minDistance) {
+				continue;
+			}
+
+			const overlap = minDistance - Math.max(radialDistance, 0.0001);
+			const nx = radialDistance <= 0.0001 ? axisX : offsetX / radialDistance;
+			const nz = radialDistance <= 0.0001 ? axisZ : offsetZ / radialDistance;
+			player.x += nx * overlap;
+			player.z += nz * overlap;
+			changed = true;
+			continue;
+		}
+
+		const minDistance = playerRadius + obstacle.radius;
+		const dx = player.x - obstacle.x;
+		const dz = player.z - obstacle.z;
+		const distance = Math.hypot(dx, dz);
+		if (distance >= minDistance) {
+			continue;
+		}
+
+		const overlap = minDistance - Math.max(distance, 0.0001);
+		const nx = distance <= 0.0001 ? Math.cos(Math.random() * Math.PI * 2) : dx / distance;
+		const nz = distance <= 0.0001 ? Math.sin(Math.random() * Math.PI * 2) : dz / distance;
+		player.x += nx * overlap;
+		player.z += nz * overlap;
+		changed = true;
+	}
+
+	const boundedX = clampToPlatform(player.x);
+	const boundedZ = clampToPlatform(player.z);
+	if (boundedX !== player.x || boundedZ !== player.z) {
+		player.x = boundedX;
+		player.z = boundedZ;
+		changed = true;
+	}
+
+	return changed;
+}
+
+function tickObstacles() {
+	if (obstacles.size === 0) {
+		return;
+	}
+
+	const dtSeconds = roundTickMs / 1000;
+	let obstaclesChanged = false;
+	const movedPlayers: PlayerState[] = [];
+
+	for (const obstacle of obstacles.values()) {
+		if (obstacle.y > 0 || obstacle.velocityY !== 0) {
+			obstacle.velocityY += obstacleFallGravity * dtSeconds;
+			obstacle.y += obstacle.velocityY * dtSeconds;
+			if (obstacle.y <= 0) {
+				obstacle.y = 0;
+				obstacle.velocityY = 0;
+			}
+
+			obstaclesChanged = true;
+		}
+
+		if (!obstacle.dynamic || obstacle.y > 0) {
+			continue;
+		}
+
+		obstacle.x += obstacle.velocityX * dtSeconds;
+		obstacle.z += obstacle.velocityZ * dtSeconds;
+		obstacle.rotationY = Math.atan2(obstacle.velocityX, obstacle.velocityZ);
+		obstaclesChanged = true;
+
+		for (const player of players.values()) {
+			const beforeX = player.x;
+			const beforeZ = player.z;
+			const moved = applyObstacleCollisions(player, true);
+			if (moved && (Math.abs(player.x - beforeX) > 0.0001 || Math.abs(player.z - beforeZ) > 0.0001)) {
+				movedPlayers.push(player);
+			}
+		}
+
+		const isOffPlatform
+			= Math.abs(obstacle.x) > platformHalfBound + barrelDespawnPadding
+				|| Math.abs(obstacle.z) > platformHalfBound + barrelDespawnPadding;
+		if (isOffPlatform) {
+			obstacles.delete(obstacle.id);
+			obstaclesChanged = true;
+		}
+	}
+
+	for (const player of movedPlayers) {
+		io.emit('playerMoved', player);
+	}
+
+	if (obstaclesChanged) {
+		broadcastObstaclesState();
+	}
+}
+
 function startHostDecisionPrompt(kind: 'initial' | 'replay') {
 	awaitingHostDecision = true;
 	hostDecisionKind = kind;
@@ -418,6 +787,8 @@ function startBreakRound() {
 }
 
 function tickRoundLoop() {
+	tickObstacles();
+
 	if (awaitingHostDecision) {
 		if (!getHostPlayer()) {
 			ensureHostAssigned();
@@ -464,6 +835,7 @@ function tickRoundLoop() {
 
 		if (timeLeftMs <= 0) {
 			eliminatePlayersOutsideCorrectZone();
+			spawnObstacleAtRoundEnd(roundState.round);
 			if (alivePlayerCount() === 0) {
 				startHostDecisionPrompt('replay');
 				return;
@@ -500,6 +872,23 @@ if (process.env.BEARCAT_GAME_DEBUG) {
 
 	app.get('/debug/players', (_request, res) => {
 		res.json([...players.values()]);
+	});
+
+	app.get('/debug/obstacles', (_request, res) => {
+		res.json(serializeObstacles());
+	});
+
+	app.post('/debug/spawn-obstacle', (request, res) => {
+		const rawKind = typeof request.body?.kind === 'string' ? request.body.kind : 'random';
+		const kind = rawKind === 'cone' || rawKind === 'box' || rawKind === 'barrel' || rawKind === 'random'
+			? rawKind
+			: 'random';
+		spawnObstacleByKind(kind);
+		res.json({
+			ok: true,
+			kind,
+			obstacles: serializeObstacles(),
+		});
 	});
 
 	app.patch('/debug/players/:id', (request, res) => {
@@ -588,10 +977,12 @@ io.on('connection', socket => {
 		modelFile: newPlayer.modelFile,
 		players: Object.fromEntries(players),
 		roundState,
+		obstacles: serializeObstacles(),
 	});
 
 	socket.broadcast.emit('playerJoined', newPlayer);
 	socket.emit('roundState', roundState);
+	socket.emit('obstaclesState', serializeObstacles());
 
 	socket.on('playerUpdate', (data: Omit<PlayerState, 'id' | 'modelFile'>) => {
 		if (awaitingHostDecision) {
@@ -609,8 +1000,10 @@ io.on('connection', socket => {
 		p.rotationY = data.rotationY;
 		p.velocityY = data.velocityY;
 		p.animation = data.animation;
+		applyObstacleCollisions(p, true);
 
 		socket.broadcast.emit('playerMoved', p);
+		socket.emit('playerMoved', p);
 	});
 
 	socket.on('attack', (data: {x: number; z: number; rotationY: number}) => {

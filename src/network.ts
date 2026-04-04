@@ -18,6 +18,7 @@ export type InitPayload = {
 	modelFile: string;
 	players: Record<string, RemotePlayerData>;
 	roundState?: RoundState;
+	obstacles?: ObstacleData[];
 };
 
 export type AttackData = {
@@ -46,6 +47,21 @@ export type RoundState = {
 	zones: AnswerZoneData[];
 };
 
+export type ObstacleData = {
+	id: string;
+	kind: 'cone' | 'box' | 'barrel';
+	modelFile: string;
+	x: number;
+	y: number;
+	z: number;
+	rotationY: number;
+	radius: number;
+	height: number;
+	dynamic: boolean;
+	velocityX: number;
+	velocityZ: number;
+};
+
 export type NetworkCallbacks = {
 	onInit: (payload: InitPayload) => void;
 	onPlayerJoined: (player: RemotePlayerData) => void;
@@ -55,6 +71,7 @@ export type NetworkCallbacks = {
 	onKnockback: (data: {x: number; z: number}) => void;
 	onRoundState: (state: RoundState) => void;
 	onHostGamePrompt: (payload: {initialStart: boolean}) => void;
+	onObstaclesState: (obstacles: ObstacleData[]) => void;
 };
 
 let socket: Socket | undefined;
@@ -93,6 +110,10 @@ export function connect(callbacks: NetworkCallbacks) {
 
 	socket.on('hostGamePrompt', (payload: {initialStart: boolean}) => {
 		callbacks.onHostGamePrompt(payload);
+	});
+
+	socket.on('obstaclesState', (obstacles: ObstacleData[]) => {
+		callbacks.onObstaclesState(obstacles);
 	});
 }
 

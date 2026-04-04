@@ -7,6 +7,7 @@ import {
 	sendHostGameDecision,
 	type RemotePlayerData,
 	type RoundState,
+	type ObstacleData,
 } from './network';
 
 const scene = new THREE.Scene();
@@ -428,6 +429,7 @@ function pickRandomIdle() {
 }
 
 const modelsDir = 'assets/models/players/';
+const obstacleModelsDir = 'assets/models/obstacles/';
 const loader = new GLTFLoader();
 
 function disposeGroupContents(group: THREE.Group) {
@@ -542,8 +544,298 @@ type ZoneVisual = {
 	labelText: string;
 };
 
+type ObstacleRuntime = {
+	group: THREE.Group;
+	visualRoot: THREE.Group;
+	data: ObstacleData;
+	loadToken: number;
+	lastModelFile: string;
+	barrelRoll: number;
+	lastPosition: THREE.Vector3;
+};
+
 const remotePlayers = new Map<string, RemotePlayer>();
 const zoneVisuals = new Map<number, ZoneVisual>();
+const obstacleRuntimes = new Map<string, ObstacleRuntime>();
+
+const obstacleVisualYOffset: Record<ObstacleData['kind'], number> = {
+	cone: 0,
+	box: -1.22,
+	barrel: 0,
+};
+
+function createObstacleFallbackMesh(data: ObstacleData): THREE.Object3D {
+	if (data.kind === 'cone') {
+		const cone = new THREE.Mesh(
+			new THREE.ConeGeometry(Math.max(0.25, data.radius), 1.1, 18),
+			new THREE.MeshStandardMaterial({color: 0xEC_7B_28}),
+		);
+		cone.position.y = 0.55;
+		cone.castShadow = true;
+		cone.receiveShadow = true;
+		return cone;
+	}
+
+	if (data.kind === 'box') {
+		const box = new THREE.Mesh(
+			new THREE.BoxGeometry(data.radius * 1.8, 1.1, data.radius * 1.8),
+			new THREE.MeshStandardMaterial({color: 0x86_6A_44}),
+		);
+		box.position.y = 0.55;
+		box.castShadow = true;
+		box.receiveShadow = true;
+		return box;
+	}
+
+	const barrel = new THREE.Mesh(
+		new THREE.CylinderGeometry(data.radius, data.radius, 1.25, 20),
+		new THREE.MeshStandardMaterial({color: 0x6E_88_97}),
+	);
+	barrel.position.y = 0.62;
+	barrel.castShadow = true;
+	barrel.receiveShadow = true;
+	return barrel;
+}
+
+function loadObstacleModel(runtime: ObstacleRuntime) {
+	runtime.loadToken++;
+	const {loadToken} = runtime;
+	runtime.lastModelFile = runtime.data.modelFile;
+	disposeGroupContents(runtime.visualRoot);
+	runtime.visualRoot.add(createObstacleFallbackMesh(runtime.data));
+
+	loader.load(obstacleModelsDir + runtime.data.modelFile, gltf => {
+		if (runtime.loadToken !== loadToken) {
+			return;
+		}
+
+		disposeGroupContents(runtime.visualRoot);
+		const modelRoot = gltf.scene;
+		if (runtime.data.kind === 'box') {
+			modelRoot.scale.setScalar(0.8);
+		}
+
+		modelRoot.traverse(node => {
+			if ((node as THREE.Mesh).isMesh) {
+				node.castShadow = true;
+				node.receiveShadow = true;
+			}
+		});
+
+		// Align imported mesh pivot to gameplay collision center on XZ and rest on platform Y=0.
+		const bounds = new THREE.Box3().setFromObject(modelRoot);
+		if (isFinite(bounds.min.x) && isFinite(bounds.min.y) && isFinite(bounds.min.z)) {
+			const center = new THREE.Vector3();
+			bounds.getCenter(center);
+			modelRoot.position.x -= center.x;
+			modelRoot.position.z -= center.z;
+			modelRoot.position.y -= bounds.min.y;
+			modelRoot.position.y += obstacleVisualYOffset[runtime.data.kind];
+		}
+
+		runtime.visualRoot.add(modelRoot);
+	});
+}
+
+function removeObstacleRuntime(id: string) {
+	const runtime = obstacleRuntimes.get(id);
+	if (!runtime) {
+		return;
+	}
+
+	disposeGroupContents(runtime.visualRoot);
+	scene.remove(runtime.group);
+	obstacleRuntimes.delete(id);
+}
+
+function syncObstacles(obstacles: ObstacleData[]) {
+	const liveIds = new Set<string>();
+	for (const data of obstacles) {
+		liveIds.add(data.id);
+		let runtime = obstacleRuntimes.get(data.id);
+		if (runtime) {
+			runtime.data = data;
+		} else {
+			const group = new THREE.Group();
+			const visualRoot = new THREE.Group();
+			group.add(visualRoot);
+			group.position.set(data.x, data.y, data.z);
+			group.rotation.y = data.rotationY;
+			scene.add(group);
+			runtime = {
+				group,
+				visualRoot,
+				data,
+				loadToken: 0,
+				lastModelFile: '',
+				barrelRoll: 0,
+				lastPosition: new THREE.Vector3(data.x, data.y, data.z),
+			};
+			obstacleRuntimes.set(data.id, runtime);
+			loadObstacleModel(runtime);
+		}
+
+		if (runtime.lastModelFile !== data.modelFile) {
+			loadObstacleModel(runtime);
+		}
+	}
+
+	for (const id of obstacleRuntimes.keys()) {
+		if (liveIds.has(id)) {
+			continue;
+		}
+
+		removeObstacleRuntime(id);
+	}
+}
+
+function resolveLocalPlayerObstacleCollisions() {
+	if (isLocalDead) {
+		return;
+	}
+
+	for (const runtime of obstacleRuntimes.values()) {
+		const obstacle = runtime.data;
+		if (obstacle.y > 0.01) {
+			continue;
+		}
+
+		if (obstacle.kind === 'box') {
+			const topY = obstacle.y + obstacle.height;
+			const boxHalf = obstacle.radius;
+			const expandedHalf = boxHalf + playerRadius;
+			const localX = player.position.x - obstacle.x;
+			const localZ = player.position.z - obstacle.z;
+			const insideExpanded = Math.abs(localX) < expandedHalf && Math.abs(localZ) < expandedHalf;
+			if (!insideExpanded) {
+				continue;
+			}
+
+			const isOnTop
+				= player.position.y >= topY - 0.12
+					&& Math.abs(localX) <= boxHalf - 0.02
+					&& Math.abs(localZ) <= boxHalf - 0.02;
+			if (isOnTop) {
+				continue;
+			}
+
+			const penetrationX = expandedHalf - Math.abs(localX);
+			const penetrationZ = expandedHalf - Math.abs(localZ);
+			if (penetrationX <= penetrationZ) {
+				const directionX = localX === 0 ? (Math.random() < 0.5 ? -1 : 1) : Math.sign(localX);
+				player.position.x += directionX * penetrationX;
+			} else {
+				const directionZ = localZ === 0 ? (Math.random() < 0.5 ? -1 : 1) : Math.sign(localZ);
+				player.position.z += directionZ * penetrationZ;
+			}
+
+			continue;
+		}
+
+		if (obstacle.kind === 'barrel') {
+			const barrelTop = obstacle.y + obstacle.radius * 2;
+			const aboveBarrelTop = player.position.y >= barrelTop - 0.02;
+			if (aboveBarrelTop) {
+				continue;
+			}
+
+			const axisX = Math.cos(obstacle.rotationY);
+			const axisZ = -Math.sin(obstacle.rotationY);
+			const halfLength = obstacle.height * 0.5;
+			const dx = player.position.x - obstacle.x;
+			const dz = player.position.z - obstacle.z;
+			const along = dx * axisX + dz * axisZ;
+			const clampedAlong = Math.max(-halfLength, Math.min(halfLength, along));
+			const nearestX = obstacle.x + axisX * clampedAlong;
+			const nearestZ = obstacle.z + axisZ * clampedAlong;
+			const offsetX = player.position.x - nearestX;
+			const offsetZ = player.position.z - nearestZ;
+			const radialDistance = Math.hypot(offsetX, offsetZ);
+			const minDistance = playerRadius + obstacle.radius;
+			if (radialDistance >= minDistance) {
+				continue;
+			}
+
+			const overlap = minDistance - Math.max(radialDistance, 0.0001);
+			const nx = radialDistance <= 0.0001 ? axisX : offsetX / radialDistance;
+			const nz = radialDistance <= 0.0001 ? axisZ : offsetZ / radialDistance;
+			player.position.x += nx * overlap;
+			player.position.z += nz * overlap;
+			continue;
+		}
+
+		const dx = player.position.x - obstacle.x;
+		const dz = player.position.z - obstacle.z;
+		const distance = Math.hypot(dx, dz);
+		const minDistance = playerRadius + obstacle.radius;
+		if (distance >= minDistance) {
+			continue;
+		}
+
+		const overlap = minDistance - Math.max(distance, 0.0001);
+		const nx = distance <= 0.0001 ? Math.cos(Math.random() * Math.PI * 2) : dx / distance;
+		const nz = distance <= 0.0001 ? Math.sin(Math.random() * Math.PI * 2) : dz / distance;
+		player.position.x += nx * overlap;
+		player.position.z += nz * overlap;
+	}
+}
+
+function getSupportHeightAtPosition(x: number, z: number, y: number, velocityY: number): number {
+	let supportHeight = 0;
+	for (const runtime of obstacleRuntimes.values()) {
+		const obstacle = runtime.data;
+		if (obstacle.y > 0.01) {
+			continue;
+		}
+
+		if (obstacle.kind !== 'box' && obstacle.kind !== 'barrel') {
+			continue;
+		}
+
+		if (obstacle.kind === 'barrel') {
+			const axisX = Math.cos(obstacle.rotationY);
+			const axisZ = -Math.sin(obstacle.rotationY);
+			const halfLength = obstacle.height * 0.5;
+			const dx = x - obstacle.x;
+			const dz = z - obstacle.z;
+			const along = dx * axisX + dz * axisZ;
+			const clampedAlong = Math.max(-halfLength, Math.min(halfLength, along));
+			const nearestX = obstacle.x + axisX * clampedAlong;
+			const nearestZ = obstacle.z + axisZ * clampedAlong;
+			const radialDistance = Math.hypot(x - nearestX, z - nearestZ);
+			if (radialDistance > obstacle.radius - 0.03) {
+				continue;
+			}
+
+			const topY = obstacle.y + obstacle.radius * 2;
+			const canLandOnTop = velocityY <= 0 && y <= topY + 0.28 && y >= topY - 0.22;
+			if (!canLandOnTop) {
+				continue;
+			}
+
+			supportHeight = Math.max(supportHeight, topY);
+			continue;
+		}
+
+		const dx = x - obstacle.x;
+		const dz = z - obstacle.z;
+		const boxHalf = obstacle.radius;
+		const insideTopArea = Math.abs(dx) <= boxHalf - 0.03 && Math.abs(dz) <= boxHalf - 0.03;
+		if (!insideTopArea) {
+			continue;
+		}
+
+		const topY = obstacle.y + obstacle.height;
+		const canLandOnTop = velocityY <= 0 && y <= topY + 0.28 && y >= topY - 0.22;
+		if (!canLandOnTop) {
+			continue;
+		}
+
+		supportHeight = Math.max(supportHeight, topY);
+	}
+
+	return supportHeight;
+}
 
 function createTextSprite(text: string): THREE.Sprite {
 	const canvas = document.createElement('canvas');
@@ -950,6 +1242,10 @@ connect({
 			applyRoundState(payload.roundState);
 		}
 
+		if (payload.obstacles) {
+			syncObstacles(payload.obstacles);
+		}
+
 		// Apply server-assigned spawn position
 		const me = payload.players[payload.id];
 		if (me) {
@@ -1008,7 +1304,7 @@ connect({
 			player.position.set(playerData.x, playerData.y, playerData.z);
 			player.rotation.y = playerData.rotationY;
 			velocity.y = playerData.velocityY;
-			onGround = player.position.y <= 0;
+			onGround = player.position.y <= getSupportHeightAtPosition(player.position.x, player.position.z, player.position.y, velocity.y) + 0.0001;
 			currentAnimName = playerData.animation;
 			return;
 		}
@@ -1073,6 +1369,9 @@ connect({
 		currentHostPromptIsInitialStart = payload.initialStart;
 		isAwaitingHostDecision = true;
 		showHostDecisionDialog();
+	},
+	onObstaclesState(obstacles) {
+		syncObstacles(obstacles);
 	},
 });
 
@@ -1193,10 +1492,13 @@ function animate() {
 		player.position.y += velocity.y * dt;
 	}
 
-	if (player.position.y <= 0) {
-		player.position.y = 0;
+	const supportHeight = getSupportHeightAtPosition(player.position.x, player.position.z, player.position.y, velocity.y);
+	if (player.position.y <= supportHeight) {
+		player.position.y = supportHeight;
 		velocity.y = 0;
 		onGround = true;
+	} else {
+		onGround = false;
 	}
 
 	if (!isLocalDead) {
@@ -1224,6 +1526,8 @@ function animate() {
 			}
 		}
 	}
+
+	resolveLocalPlayerObstacleCollisions();
 
 	player.position.x = Math.max(-halfBound, Math.min(halfBound, player.position.x));
 	player.position.z = Math.max(-halfBound, Math.min(halfBound, player.position.z));
@@ -1278,6 +1582,36 @@ function animate() {
 		remote.group.rotation.y += angleDiff * 0.2;
 
 		remote.mixer?.update(dt);
+	}
+
+	for (const runtime of obstacleRuntimes.values()) {
+		const isAirborne = runtime.data.y > 0.001;
+		if (runtime.data.dynamic || isAirborne) {
+			runtime.group.position.lerp(
+				new THREE.Vector3(runtime.data.x, runtime.data.y, runtime.data.z),
+				0.35,
+			);
+		} else {
+			runtime.group.position.set(runtime.data.x, runtime.data.y, runtime.data.z);
+		}
+
+		const angleDiff = runtime.data.rotationY - runtime.group.rotation.y;
+		runtime.group.rotation.y += angleDiff * 0.25;
+
+		if (runtime.data.kind === 'barrel') {
+			const deltaX = runtime.group.position.x - runtime.lastPosition.x;
+			const deltaZ = runtime.group.position.z - runtime.lastPosition.z;
+			const travelDistance = Math.hypot(deltaX, deltaZ);
+			runtime.barrelRoll += travelDistance / Math.max(runtime.data.radius, 0.001);
+			runtime.visualRoot.position.y = runtime.data.radius;
+			runtime.visualRoot.rotation.x = runtime.barrelRoll;
+			runtime.visualRoot.rotation.z = Math.PI / 2;
+		} else {
+			runtime.visualRoot.position.y = 0;
+			runtime.visualRoot.rotation.set(0, 0, 0);
+		}
+
+		runtime.lastPosition.copy(runtime.group.position);
 	}
 
 	renderer.render(scene, camera);
