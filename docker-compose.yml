@@ -7,8 +7,6 @@ services:
       POSTGRES_USER: livetrivia
       POSTGRES_PASSWORD: livetrivia
       POSTGRES_DB: livetrivia
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -16,6 +14,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - livetrivia_net
 
   api:
     build:
@@ -39,8 +39,15 @@ services:
       S3_URL: http://unused/
       S3_REGION: us-east-1
       BUCKET_NAME: unused
-    ports:
-      - "8000:8000"
+      DOCKER_NETWORK: livetrivia_net
+      GAME_IMAGE: livetrivia-game:latest
+      NGINX_CONTAINER_NAME: livetrivia_nginx
+      NGINX_CONF_PATH: /nginx_conf
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - nginx_config:/nginx_conf
+    networks:
+      - livetrivia_net
 
   sglang:
     image: lmsysorg/sglang:dev
@@ -73,6 +80,8 @@ services:
               capabilities: [gpu]
     stdin_open: true
     tty: true
+    networks:
+      - livetrivia_net
 
   app:
     build:
@@ -85,8 +94,29 @@ services:
       - api
     environment:
       BACKEND_URL: http://api:8000/
+    networks:
+      - livetrivia_net
+
+  nginx:
+    image: nginx:alpine
+    container_name: livetrivia_nginx
+    restart: unless-stopped
+    depends_on:
+      - app
+      - api
     ports:
-      - "7777:7777"
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - nginx_config:/etc/nginx/conf.d/games
+    networks:
+      - livetrivia_net
+
+networks:
+  livetrivia_net:
+    name: livetrivia_net
 
 volumes:
   postgres_data:
+  nginx_config:

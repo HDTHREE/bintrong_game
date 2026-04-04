@@ -20,6 +20,9 @@ class Game(SQLModel, table=True):
     host_session_id: uuid.UUID = Field(foreign_key="session.id")
     """Foreign key column: Relates the owner to this entry."""
 
+    selected_file_id: uuid.UUID | None = Field(default=None, foreign_key="file.id")
+    """Foreign key column: Anki file selected to drive this game's questions."""
+
     game_code: str | None = Field(
         default=fnt.partial(generate_random_string, length=6), unique=True, index=True
     )

@@ -5,11 +5,15 @@ from datetime import datetime
 import uuid
 
 from livetrivia.db import SqlSession
+from livetrivia.docker_manager import spawn_game_server, stop_game_server
+from livetrivia.models.files import File
 from livetrivia.models.game import Game, GamePlayer
 from livetrivia.models.session import Session
 from livetrivia.models.status import Status
 from livetrivia.jwt_utils import verify_token
 from livetrivia.routes.session import BearerCredentials
+
+_ANKI_EXTENSIONS: tuple[str, ...] = (".apkg", ".anki")
 
 router: APIRouter = APIRouter(prefix="/games", tags=["games"])
 
@@ -18,6 +22,7 @@ class GameResponse(BaseModel):
     id: uuid.UUID
     host_session_id: uuid.UUID
     game_code: str | None
+    selected_file_id: uuid.UUID | None
     status: Status
     created_at: datetime
     started_at: datetime | None
@@ -186,7 +191,8 @@ async def start_game(
     await sql.commit()
     await sql.refresh(game)
 
-    # TODO This doesn't actually start a game.
+    if game.game_code:
+        spawn_game_server(game.game_code)
 
     return game
 
@@ -246,7 +252,8 @@ async def end_game(
     await sql.commit()
     await sql.refresh(game)
 
-    # TODO This doesn't actually end (there isn't) anything.
+    if game.game_code:
+        stop_game_server(game.game_code)
 
     return game
 
@@ -315,3 +322,75 @@ async def increment_player_score(
     await sql.refresh(player)
 
     return player
+
+
+@router.post(
+    "/{game_id}/file",
+    response_model=GameResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def set_game_file(
+    game_id: uuid.UUID,
+    file_id: uuid.UUID,
+    sql: SqlSession,
+    credentials: BearerCredentials,
+) -> Game:
+    access_token = credentials.credentials
+    user_id = verify_token(access_token, token_type="access")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired access token",
+        )
+
+    stmt = select(Session).where(
+        (Session.access_token == access_token) & (Session.is_active)
+    )
+    result = await sql.execute(stmt)
+    session = result.scalars().first()
+
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found or inactive",
+        )
+
+    stmt = select(Game).where(Game.id == game_id)
+    result = await sql.execute(stmt)
+    game = result.scalars().first()
+
+    if not game:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Game not found"
+        )
+
+    if game.host_session_id != session.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the game host can set the game file",
+        )
+
+    if game.status != Status.STARTING:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Game file can only be set while the game is in STARTING status",
+        )
+
+    file = await sql.get(File, file_id)
+    if not file:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="File not found"
+        )
+
+    if not any(file.prefix.endswith(ext) for ext in _ANKI_EXTENSIONS):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Selected file must be an Anki file (.apkg or .anki)",
+        )
+
+    game.selected_file_id = file_id
+    sql.add(game)
+    await sql.commit()
+    await sql.refresh(game)
+
+    return game
