@@ -13,6 +13,61 @@ app: dash.Dash = dash.get_app()
 """Reference to global dash object."""
 
 
+
+_BASE_COLUMN_DEFS=[
+    {
+        "headerName": "Delete",
+        "cellRenderer": "dmcButton",
+        "cellRendererParams": {
+            "rightIcon": "ic:round-delete",
+            "value": "Delete",
+            "color": "red",
+        },
+        "field": "user_id",
+        "colId": "Delete",
+        "flex": 1,
+    },
+    {
+        "headerName": "Download",
+        "cellRenderer": "dmcButton",
+        "cellRendererParams": {
+            "rightIcon": "ic:round-file-download",
+            "value": "Download",
+        },
+        "field": "user_id",
+        "colId": "Download",
+        "flex": 1,
+    },
+]
+
+DEFAULT_COLUMN_DEFS=[
+    {
+        "headerName": "File Name",
+        "field": "prefix",
+        "flex": 3,
+        "valueGetter": {"function": "nameGetter(params)"},
+    },
+    {
+        "headerName": "Origin",
+        "field": "generated_from_prefix",
+        "flex": 3,
+        "valueGetter": {"function": "originGetter(params)"},
+    },
+    *_BASE_COLUMN_DEFS,
+]
+
+
+ID_COLUMN_DEFS=[
+    {"headerName": "File ID", "field": "id", "flex": 3},
+    {
+        "headerName": "Origin ID",
+        "field": "generated_from_id",
+        "flex": 3,
+        "valueGetter": {"function": "originIdGetter(params)"},},
+    *_BASE_COLUMN_DEFS,
+]
+
+
 BACKEND_URL: str = getenvs(logger=app.logger)
 """URL to backend service."""
 
@@ -31,7 +86,14 @@ layout: dmc.AppShellMain = dmc.AppShellMain(
         children=dmc.Card(
             children=dmc.Stack(
                 children=[
-                    dmc.Title("Your Files", order=2),
+                    dmc.Flex(
+                        children=[
+                            dmc.Title("Your Files", order=2),
+                            show_ids_checkbox := dmc.Checkbox(label="Show IDs")
+                        ],
+                        w="100%",
+                        justify="space-between",
+                    ),
                     dmc.Flex(
                         w="100%",
                         justify="space-around",
@@ -56,38 +118,7 @@ layout: dmc.AppShellMain = dmc.AppShellMain(
                         ],
                     ),
                     grid := dag.AgGrid(
-                        columnDefs=[
-                            {
-                                "headerName": "File Name",
-                                "field": "prefix",
-                                "flex": 3,
-                                "valueGetter": {"function": "nameGetter(params)"},
-                            },
-                            {"headerName": "File ID", "field": "id", "flex": 3},
-                            {
-                                "headerName": "Delete",
-                                "cellRenderer": "dmcButton",
-                                "cellRendererParams": {
-                                    "rightIcon": "ic:round-delete",
-                                    "value": "Delete",
-                                    "color": "red",
-                                },
-                                "field": "user_id",
-                                "colId": "Delete",
-                                "flex": 1,
-                            },
-                            {
-                                "headerName": "Download",
-                                "cellRenderer": "dmcButton",
-                                "cellRendererParams": {
-                                    "rightIcon": "ic:round-file-download",
-                                    "value": "Download",
-                                },
-                                "field": "user_id",
-                                "colId": "Download",
-                                "flex": 1,
-                            },
-                        ],
+                        columnDefs=DEFAULT_COLUMN_DEFS,
                         className="ag-theme-alpine",
                         dashGridOptions={
                             "pagination": True,
@@ -199,6 +230,7 @@ async def _get_files_data(session: aiohttp.ClientSession, headers: dict) -> list
     async with session.get("api/files/data/", headers=headers) as resp:
         if resp.status != 200:
             raise de.PreventUpdate()
+        print(await resp.json())
         return await resp.json()
 
 
@@ -253,6 +285,17 @@ async def get_youtube_transcript(_: int, youtube_text_input_value: str | None, t
                 raise de.PreventUpdate()
         return await _get_files_data(session, headers)
     
+
+
+
+@app.callback(
+    dash.Output(grid, "columnDefs"),
+    dash.Input(show_ids_checkbox, "checked"),
+    prevent_initial_call=True,
+)
+async def set_columns(checked: bool):
+    return ID_COLUMN_DEFS if checked else DEFAULT_COLUMN_DEFS
+
 
 open_upload: ClientsideFunctionType = app.clientside_callback(
     dash.ClientsideFunction("files", "openUpload"),

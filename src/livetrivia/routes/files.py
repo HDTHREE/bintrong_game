@@ -118,7 +118,17 @@ async def get_file_data(
         raise HTTPException(status_code=404, detail="file not found")
     if file.user_id != user_id:
         raise HTTPException(status_code=403, detail="forbidden")
-    return file
+    generated_from_prefix: str | None = None
+    if file.generated_from_id is not None:
+        source = await sql.get(File, file.generated_from_id)
+        generated_from_prefix = source.prefix if source else None
+    return FileDataResponse(
+        id=file.id,
+        prefix=file.prefix,
+        user_id=file.user_id,
+        generated_from_id=file.generated_from_id,
+        generated_from_prefix=generated_from_prefix,
+    )
 
 
 @router.get(
@@ -131,6 +141,14 @@ async def get_all_files_data(
     stmt = select(File).where(File.user_id == user_id)
     result = await sql.execute(stmt)
     files = result.scalars().all()
+    prefix_map: dict[uuid.UUID, str] = {f.id: f.prefix for f in files}
     return [
-        FileDataResponse(id=f.id, prefix=f.prefix, user_id=f.user_id) for f in files
+        FileDataResponse(
+            id=f.id,
+            prefix=f.prefix,
+            user_id=f.user_id,
+            generated_from_id=f.generated_from_id,
+            generated_from_prefix=prefix_map.get(f.generated_from_id) if f.generated_from_id else None,
+        )
+        for f in files
     ]

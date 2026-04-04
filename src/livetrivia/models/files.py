@@ -43,6 +43,10 @@ class FileDataResponse(BaseModel):
     """Filepath where file contents are located."""
     user_id: uuid.UUID
     """Relates the owner to this entry."""
+    generated_from_id: uuid.UUID | None
+    """Foreign key column: File used to generate this."""
+    generated_from_prefix: str | None = None
+    """File prefix used to generate this."""
 
     class Config:
         from_attributes = True
