@@ -264,7 +264,7 @@ function spawnLightningBolt(targetWorldPosition: THREE.Vector3) {
 
 	const boltGeometry = new THREE.BufferGeometry().setFromPoints(points);
 	const boltMaterial = new THREE.LineBasicMaterial({
-		color: 0xc8eeff,
+		color: 0xC8_EE_FF,
 		transparent: true,
 		opacity: 0.95,
 	});
@@ -274,7 +274,7 @@ function spawnLightningBolt(targetWorldPosition: THREE.Vector3) {
 	const flash = new THREE.Mesh(
 		new THREE.SphereGeometry(0.45, 12, 12),
 		new THREE.MeshBasicMaterial({
-			color: 0xe9fbff,
+			color: 0xE9_FB_FF,
 			transparent: true,
 			opacity: 0.88,
 		}),
@@ -373,31 +373,29 @@ function playDeathAnimation(
 	assignCurrentAction(targetActions._death);
 }
 
-function runDeathSequence(
-	params: {
-		worldPosition: THREE.Vector3;
-		playDeath: () => void;
-		finalizeDeath: () => void;
-		isStale: () => boolean;
-	},
-) {
-	params.playDeath();
+function runDeathSequence(parameters: {
+	worldPosition: THREE.Vector3;
+	playDeath: () => void;
+	finalizeDeath: () => void;
+	isStale: () => boolean;
+}) {
+	parameters.playDeath();
 
 	setTimeout(() => {
-		if (params.isStale()) {
+		if (parameters.isStale()) {
 			return;
 		}
 
-		spawnLightningBolt(params.worldPosition);
+		spawnLightningBolt(parameters.worldPosition);
 		playRandomLightningSound();
 	}, 10);
 
 	setTimeout(() => {
-		if (params.isStale()) {
+		if (parameters.isStale()) {
 			return;
 		}
 
-		params.finalizeDeath();
+		parameters.finalizeDeath();
 	}, 40);
 }
 
@@ -714,22 +712,36 @@ function updateZoneVisuals(roundState: RoundState) {
 function applyRoundState(roundState: RoundState) {
 	currentRoundPhase = roundState.phase;
 	const secondsLeft = Math.ceil(roundState.timeLeftMs / 1000);
-	if (roundState.phase === 'question') {
-		roundTimer.textContent = `Round ${roundState.round} | ${secondsLeft}s`;
-		roundQuestion.textContent = roundState.question;
-	} else if (roundState.phase === 'break') {
-		roundTimer.textContent = `Break | ${secondsLeft}s`;
-		roundQuestion.textContent = 'Next question incoming...';
-	} else if (roundState.phase === 'hostPrompt') {
-		roundTimer.textContent = currentHostPromptIsInitialStart ? 'Ready' : 'Game Over';
-		roundQuestion.textContent = isLocalHost
-			? (currentHostPromptIsInitialStart
-				? 'Click Start when everyone has joined.'
-				: 'Choose if you want to play again.')
-			: 'Waiting for host';
-	} else {
-		roundTimer.textContent = 'Waiting';
-		roundQuestion.textContent = roundState.question || 'Waiting for players';
+	switch (roundState.phase) {
+		case 'question': {
+			roundTimer.textContent = `Round ${roundState.round} | ${secondsLeft}s`;
+			roundQuestion.textContent = roundState.question;
+
+			break;
+		}
+
+		case 'break': {
+			roundTimer.textContent = `Break | ${secondsLeft}s`;
+			roundQuestion.textContent = 'Next question incoming...';
+
+			break;
+		}
+
+		case 'hostPrompt': {
+			roundTimer.textContent = currentHostPromptIsInitialStart ? 'Ready' : 'Game Over';
+			roundQuestion.textContent = isLocalHost
+				? (currentHostPromptIsInitialStart
+					? 'Click Start when everyone has joined.'
+					: 'Choose if you want to play again.')
+				: 'Waiting for host';
+
+			break;
+		}
+
+		default: {
+			roundTimer.textContent = 'Waiting';
+			roundQuestion.textContent = roundState.question || 'Waiting for players';
+		}
 	}
 
 	updateHostDecisionOverlay(roundState);
@@ -883,12 +895,12 @@ function updateRemotePlayer(data: RemotePlayerData) {
 
 		runDeathSequence({
 			worldPosition,
-			playDeath: () => {
+			playDeath() {
 				playDeathAnimation(remote.mixer, remote.actions, remote.currentAction, action => {
 					remote.currentAction = action;
 				});
 			},
-			finalizeDeath: () => {
+			finalizeDeath() {
 				remote.group.visible = false;
 			},
 			isStale: () => token !== remote.deathSequenceToken || !remote.dead,
@@ -971,13 +983,13 @@ connect({
 				player.visible = true;
 				runDeathSequence({
 					worldPosition: player.getWorldPosition(new THREE.Vector3()),
-					playDeath: () => {
+					playDeath() {
 						playDeathAnimation(mixer, actions, currentAction, action => {
 							currentAction = action;
 							currentAnimName = 'death';
 						});
 					},
-					finalizeDeath: () => {
+					finalizeDeath() {
 						setLocalDead(true);
 					},
 					isStale: () => token !== localDeathSequenceToken || !isLocalDead,
@@ -992,6 +1004,7 @@ connect({
 				isAwaitingHostDecision = false;
 				hideHostDecisionDialog();
 			}
+
 			player.position.set(playerData.x, playerData.y, playerData.z);
 			player.rotation.y = playerData.rotationY;
 			velocity.y = playerData.velocityY;

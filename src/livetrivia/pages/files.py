@@ -5,7 +5,7 @@ import dash.exceptions as de
 import dash_mantine_components as dmc
 import dash_ag_grid as dag
 import aiohttp
-from livetrivia.utils import getmod, getenvs
+from livetrivia.utils import getmod, getenvs, ClientsideFunctionType
 from livetrivia.shared_components import token_store, user_store
 
 
@@ -36,7 +36,7 @@ layout: dmc.AppShellMain = dmc.AppShellMain(
                         w="100%",
                         justify="space-around",
                         children=[
-                            dmc.Button(
+                            upload_button := dmc.Button(
                                 upload := dash.dcc.Upload(
                                     children=dmc.Text(children="Upload File"),
                                     multiple=False,
@@ -220,6 +220,14 @@ async def upload_file(contents: str, filename: str, token: dict):
             if resp.status != 200:
                 raise de.PreventUpdate()
             return await resp.json()
+
+
+open_upload: ClientsideFunctionType = app.clientside_callback(
+    dash.ClientsideFunction("files", "openUpload"),
+    dash.Input(upload_button, "n_clicks"),
+    prevent_initial_call=True,
+)
+"""Callback that opens the upload component. Part of the button isn't in the upload."""
 
 
 dash.register_page(

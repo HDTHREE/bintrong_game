@@ -2,7 +2,7 @@ import dash
 import dash.exceptions as de
 import aiohttp
 import dash_mantine_components as dmc
-from livetrivia.utils import getenvs, getmod
+from livetrivia.utils import getenvs, getmod, ClientsideFunctionType
 from livetrivia.shared_components import user_store, token_store
 
 
@@ -69,7 +69,7 @@ async def on_signout(n_clicks: int | None, token: dict):
             await delete_session_response.json()
 
 
-app.clientside_callback(
+update_display: ClientsideFunctionType = app.clientside_callback(
     dash.ClientsideFunction("accounts", "updateDisplay"),
     dash.Output(display_email, "value"),
     dash.Input(user_store, "data"),
@@ -77,7 +77,7 @@ app.clientside_callback(
 """Callback to control the text field displaying the users email."""
 
 
-app.clientside_callback(
+update_state_signout: ClientsideFunctionType = app.clientside_callback(
     dash.ClientsideFunction("accounts", "updateStateSignout"),
     dash.Output(sign_out_button, "disabled"),
     dash.Input(user_store, "data"),
@@ -85,7 +85,7 @@ app.clientside_callback(
 """Callback to update the disabled/enabled state of the sign off account button."""
 
 
-app.clientside_callback(
+redirect_to_login: ClientsideFunctionType = app.clientside_callback(
     dash.ClientsideFunction("accounts", "redirectToLogin"),
     dash.Input(sign_out_button, "n_clicks"),
     dash.Input(sign_out_devices_button, "n_clicks"),

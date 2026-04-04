@@ -219,7 +219,7 @@ function randomAnswerZones(answers: string[]): AnswerZone[] {
 	const minCenterDistance = zoneRadius * 2;
 	const maxAttemptsPerZone = 200;
 
-	for (let index = 0; index < answers.length; index++) {
+	for (const [index, answer] of answers.entries()) {
 		let placed = false;
 		for (let attempt = 0; attempt < maxAttemptsPerZone; attempt++) {
 			const candidateX = (Math.random() * 2 - 1) * answerZoneSpawnBound;
@@ -241,7 +241,7 @@ function randomAnswerZones(answers: string[]): AnswerZone[] {
 				x: candidateX,
 				z: candidateZ,
 				radius: zoneRadius,
-				answer: answers[index],
+				answer,
 				revealed: index === 0,
 			});
 			placed = true;
@@ -265,7 +265,7 @@ function randomAnswerZones(answers: string[]): AnswerZone[] {
 			x: fallback.x,
 			z: fallback.z,
 			radius: zoneRadius,
-			answer: answers[index],
+			answer,
 			revealed: index === 0,
 		});
 	}
@@ -397,6 +397,7 @@ function eliminatePlayersOutsideCorrectZone() {
 		if (inSafeZone) {
 			continue;
 		}
+
 		player.dead = true;
 		player.animation = 'idle';
 		io.emit('playerMoved', player);

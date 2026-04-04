@@ -5,7 +5,7 @@ import path from 'node:path';
 import process from 'node:process';
 
 const root = process.cwd();
-const toUnixPath = (relativePath) => path.resolve(root, relativePath).replaceAll('\\', '/');
+const toUnixPath = relativePath => path.resolve(root, relativePath).replaceAll('\\', '/');
 
 const questionsPath = toUnixPath('questions.apkg');
 const srcPath = toUnixPath('src');
@@ -58,7 +58,7 @@ const args = [
 	'livetrivia-game-dev:latest',
 	'sh',
 	'-c',
-	"npx concurrently \"webpack serve --host 0.0.0.0 --port 8080 --hot\" \"npx tsc -p tsconfig.server.json --watch\" \"sh -c 'until [ -f dist-server/server.js ]; do sleep 1; done; node --watch dist-server/server.js'\"",
+	'npx concurrently "webpack serve --host 0.0.0.0 --port 8080 --hot" "npx tsc -p tsconfig.server.json --watch" "sh -c \'until [ -f dist-server/server.js ]; do sleep 1; done; node --watch dist-server/server.js\'"',
 ];
 
 const result = spawnSync('docker', args, {stdio: 'inherit'});

@@ -16,6 +16,13 @@ import pydoc as pdc
 __all__: tuple[str] = ("retry_with_backoff",)
 
 
+ClientsideFunctionType: tp.TypeAlias = tp.Annotated[
+    None,
+    "Annotated `None` to allow for association of a clientside function with a name & docstring",
+]
+"""Annotated `None` to allow for association of a clientside function with a name & docstring"""
+
+
 def _log_wrap(msg: tp.Any, logger: logging.Logger | None | bool = False) -> None:
     if isinstance(logger, logging.Logger):
         return logger.debug(msg)

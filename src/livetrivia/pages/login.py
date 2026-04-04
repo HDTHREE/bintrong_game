@@ -3,7 +3,7 @@ import dash
 import dash.exceptions as de
 import dash_mantine_components as dmc
 from livetrivia.models.user import LoginRequest
-from livetrivia.utils import getenvs, getmod
+from livetrivia.utils import getenvs, getmod, ClientsideFunctionType
 from livetrivia.shared_components import token_store, user_store
 
 
@@ -117,7 +117,7 @@ async def on_signup(_: int, email: str | None, password: str | None):
     return token, email
 
 
-app.clientside_callback(
+update_current_menu: ClientsideFunctionType = app.clientside_callback(
     dash.ClientsideFunction("login", "updateCurrentMenu"),
     dash.Output(login_collapse, "opened"),
     dash.Output(create_collapse, "opened"),
@@ -128,7 +128,7 @@ app.clientside_callback(
 """Callback to toggle between the login and create account screens."""
 
 
-app.clientside_callback(
+redirect_to_account: ClientsideFunctionType = app.clientside_callback(
     dash.ClientsideFunction("login", "redirectToAccount"),
     dash.Input(create_button, "n_clicks"),
     dash.Input(login_button, "n_clicks"),
@@ -138,7 +138,7 @@ app.clientside_callback(
 """Callback to redirect the router to refresh. This triggers the callback `on_navigate` in `livetrivia._app` (i.e. navigate to `/accounts` after sign-[up|in])."""
 
 
-app.clientside_callback(
+update_state_login: ClientsideFunctionType = app.clientside_callback(
     dash.ClientsideFunction("login", "updateStateLogin"),
     dash.Output(login_button, "disabled"),
     dash.Input(email_input, "value"),
@@ -148,7 +148,7 @@ app.clientside_callback(
 """Callback to update the disabled/enabled state of the login button."""
 
 
-app.clientside_callback(
+update_state_create: ClientsideFunctionType =  app.clientside_callback(
     dash.ClientsideFunction("login", "updateStateCreate"),
     dash.Output(create_button, "disabled"),
     dash.Input(email_input, "value"),

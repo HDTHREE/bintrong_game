@@ -1,3 +1,9 @@
+globalThis.dash_clientside = { // eslint-disable-line camelcase
+	...globalThis.dash_clientside, files: {
+		openUpload: _ => document.querySelector('input[type="file"]').click(),
+	},
+};
+
 globalThis.dashAgGridFunctions = {
 	...globalThis.dashAgGridFunctions,
 	nameGetter: parameters => parameters.data.prefix ? parameters.data.prefix.split('/').pop() : '',

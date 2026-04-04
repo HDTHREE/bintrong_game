@@ -10,7 +10,7 @@ import dash_iconify as di
 import dash
 import dash.exceptions as de
 import dash_mantine_components as dmc
-from livetrivia.utils import assets_folder, getenvs, pages_folder
+from livetrivia.utils import ClientsideFunctionType, assets_folder, getenvs, pages_folder
 from livetrivia.shared_components import token_store, user_store, interval, url
 
 
@@ -84,7 +84,7 @@ app.layout = dmc.MantineProvider(
 )
 
 
-app.clientside_callback(
+set_initials: ClientsideFunctionType = app.clientside_callback(
     dash.ClientsideFunction("layout", "setInitials"),
     dash.Output(avatar, "children"),
     dash.Input(user_store, "data"),
@@ -92,7 +92,7 @@ app.clientside_callback(
 """Callback that displays the first two characters of the email."""
 
 
-app.clientside_callback(
+set_style: ClientsideFunctionType = app.clientside_callback(
     dash.ClientsideFunction("layout", "setStyle"),
     dash.Output(login_link, "style"),
     dash.Output(avatar_link, "style"),
