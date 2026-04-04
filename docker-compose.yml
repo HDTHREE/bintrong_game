@@ -17,6 +17,14 @@ services:
     networks:
       - livetrivia_net
 
+  # Note this is a build only container to ensure that the tag exists for the API.
+  game:
+    build:
+      context: .
+      dockerfile: game.Dockerfile
+    image: livetrivia-game:latest
+    command: echo 'Game build success'
+
   api:
     build:
       context: .
@@ -29,6 +37,8 @@ services:
         condition: service_healthy
       sglang:
         condition: service_started
+      game:
+        condition: service_completed_successfully
     environment:
       SQL_URL: postgresql+asyncpg://livetrivia:livetrivia@postgres:5432/livetrivia
       SECRET_KEY: changeme_in_production

@@ -15,5 +15,6 @@ questions.apkg
 *.apkg
 *.md
 docker-compose.yml
+nginx
 lt
 scripts

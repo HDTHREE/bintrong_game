@@ -22,3 +22,4 @@ server.ts
 lt
 scripts
 docker-compose.yml
+nginx
