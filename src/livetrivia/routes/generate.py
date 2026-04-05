@@ -99,7 +99,7 @@ async def _fetch_or_store_transcript(
     s3: Storage,
     sql: SqlSession,
 ) -> tuple[File, str]:
-    script_prefix = f"{user_id}/scripts/{video_id}/transcript.json"
+    script_prefix = f"{user_id}/scripts/{video_id}/transcript.txt"
 
     existing_file = (
         await sql.execute(select(File).where(File.prefix == script_prefix))
@@ -154,7 +154,7 @@ async def get_gen_text(
             raise HTTPException(status_code=403, detail="forbidden")
 
         ext = Path(file.prefix).suffix.lower()
-        if ext == ".apkg" or ext not in {".docx", ".pdf", ".txt"}:
+        if ("/scripts/" not in file.prefix) and (ext == ".apkg" or ext not in {".docx", ".pdf", ".txt"}):
             raise HTTPException(status_code=422, detail="unprocessable body")
 
         resp = await s3.get_object(Bucket=BUCKET_NAME, Key=file.prefix)
@@ -164,6 +164,7 @@ async def get_gen_text(
             ".txt": bytes.decode,
             ".pdf": get_pdf_text,
             ".docx": get_docx_text,
+            ".json": bytes.decode,
         }[ext]
         return get_text(file_bytes)
 

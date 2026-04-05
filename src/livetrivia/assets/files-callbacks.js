@@ -16,6 +16,12 @@ globalThis.dashAgGridFunctions = {
 globalThis.dashAgGridComponentFunctions = {
 	originRenderer(props) {
 		const {prefix, generated_from_prefix: generatedFromPrefix} = props.data ?? {};
+		if (generatedFromPrefix?.includes("/scripts/")) {
+			return globalThis.dashAgGridComponentFunctions.nameRenderer({...props, data: {
+				...props.data, prefix: generatedFromPrefix
+			}})
+		}
+
 		if (generatedFromPrefix) {
 			return React.createElement('span', null, decodeURIComponent(generatedFromPrefix.split('/')?.pop() ?? '')); // eslint-disable-line no-undef
 		}
@@ -54,7 +60,11 @@ globalThis.dashAgGridComponentFunctions = {
 			return React.createElement('span', null, decodeURIComponent(prefix?.split('/')?.pop() ?? '')); // eslint-disable-line no-undef
 		}
 
-		return React.createElement('span', null, title); // eslint-disable-line no-undef
+		return React.createElement( // eslint-disable-line no-undef
+			'a',
+			{href: `https://www.youtube.com/watch?v=${videoId}`, target: '_blank', rel: 'noreferrer noopener'},
+			title,
+		);
 	},
 	// Adapted from: https://www.dash-mantine-components.com/dash-ag-grid#example-2:-buttons
 	dmcButton(props) {

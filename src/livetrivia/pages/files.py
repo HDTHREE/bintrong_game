@@ -1,5 +1,6 @@
 import dash
 import base64
+import urllib.parse
 import dash_iconify as di
 import dash.exceptions as de
 import dash_mantine_components as dmc
@@ -15,6 +16,18 @@ app: dash.Dash = dash.get_app()
 
 
 _BASE_COLUMN_DEFS: list[dict[str]] = [
+    {
+        "headerName": "Generate",
+        "cellRenderer": "dmcButton",
+        "cellRendererParams": {
+            "rightIcon": "ic:baseline-attach-file",
+            "value": "Generate",
+            "color": "green",
+        },
+        "field": "user_id",
+        "colId": "Generate",
+        "flex": 1,
+    },
     {
         "headerName": "Delete",
         "cellRenderer": "dmcButton",
@@ -211,19 +224,24 @@ async def handle_file_action(
                 filename: str | None = None
                 cd: str | None = resp.headers.get("Content-Disposition")
                 if cd and "filename=" in cd:
-                    filename = cd.split("filename=")[-1].strip('"')
+                    filename = urllib.parse.unquote(cd.split("filename=")[-1].strip('"'))
                 else:
                     filename = row.get("prefix", "downloaded_file")
                     if "/" in filename:
                         filename = filename.split("/")[-1]
+                    filename = urllib.parse.unquote(filename)
                 download_data = dash.dcc.send_bytes(content, filename=filename)
+        elif action.lower() == "generate":
+            async with session.post(
+                "api/generate/",
+                json={"file_id": file_id},
+                headers=headers,
+            ) as resp:
+                if resp.status != 201:
+                    raise de.PreventUpdate()
         else:
             raise de.PreventUpdate()
-        async with session.get("api/files/data/", headers=headers) as resp:
-            if resp.status != 200:
-                raise de.PreventUpdate()
-            data: dict = await resp.json()
-            return data, download_data
+        return await _get_files_data(session, headers), download_data
 
 
 async def _get_files_data(session: aiohttp.ClientSession, headers: dict) -> list:
@@ -231,7 +249,6 @@ async def _get_files_data(session: aiohttp.ClientSession, headers: dict) -> list
     async with session.get("api/files/data/", headers=headers) as resp:
         if resp.status != 200:
             raise de.PreventUpdate()
-        print(await resp.json())
         return await resp.json()
 
 
