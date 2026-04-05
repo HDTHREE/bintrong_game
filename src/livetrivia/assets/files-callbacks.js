@@ -38,7 +38,7 @@ globalThis.dashAgGridFunctions = {
 	originIdGetter: parameters => parameters?.data?.generated_from_id ?? 'None',
 	generateParams(parameters) {
 		const prefix = parameters.data?.prefix ?? '';
-		const isAnki = prefix.endsWith('.akpg') || prefix.endsWith('.apkg');
+		const isAnki = prefix.endsWith('.apkg') || prefix.endsWith('.apkg');
 		return {
 			rightIcon: 'ic:baseline-attach-file',
 			value: 'Generate',

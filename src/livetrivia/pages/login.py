@@ -89,6 +89,8 @@ async def on_login(_: int, email: str | None, password: str | None):
         aiohttp.ClientSession(BACKEND_URL) as session,
         session.post("api/sessions/login", json=user.model_dump()) as session_response,
     ):
+        if session_response.status >= 400:
+            raise de.PreventUpdate()
         return await session_response.json(), email
 
 
@@ -105,14 +107,15 @@ async def on_signup(_: int, email: str | None, password: str | None):
     if not email or not password:
         raise de.PreventUpdate()
     user: LoginRequest = LoginRequest(email=email, password=password)
-    async with (
-        aiohttp.ClientSession(BACKEND_URL) as session,
-        session.post("api/users", json=user.model_dump()) as session_response,
-    ):
+    async with aiohttp.ClientSession(BACKEND_URL) as session:
+        async with session.post("api/users", json=user.model_dump()) as session_response:
+            if session_response.status >= 400:
+                raise de.PreventUpdate()
         async with session.post(
             "api/sessions/login", json=user.model_dump()
         ) as login_response:
-            (await session_response.json(),)
+            if login_response.status >= 400:
+                raise de.PreventUpdate()
             token = await login_response.json()
     return token, email
 

@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from datetime import datetime
 import uuid
 
-from livetrivia.db import SqlSession
+from livetrivia.db import SqlSession, Storage, BUCKET_NAME
 from livetrivia.docker_manager import spawn_game_server, stop_game_server
 from livetrivia.models.files import File
 from livetrivia.models.game import Game, GamePlayer
@@ -142,6 +142,7 @@ async def join_game(
 async def start_game(
     game_id: uuid.UUID,
     sql: SqlSession,
+    storage: Storage,
     credentials: BearerCredentials,
 ) -> Game:
     access_token = credentials.credentials
@@ -185,6 +186,21 @@ async def start_game(
             detail="Game must be in STARTING status to start",
         )
 
+    if not game.selected_file_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Game must have a file selected before starting",
+        )
+
+    file = await sql.get(File, game.selected_file_id)
+    if not file:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Selected file not found"
+        )
+
+    resp = await storage.get_object(Bucket=BUCKET_NAME, Key=file.prefix)
+    file_bytes = await resp["Body"].read()
+
     game.status = Status.RUNNING
     game.started_at = datetime.now()
     sql.add(game)
@@ -192,7 +208,7 @@ async def start_game(
     await sql.refresh(game)
 
     if game.game_code:
-        spawn_game_server(game.game_code)
+        spawn_game_server(game.game_code, file_bytes)
 
     return game
 

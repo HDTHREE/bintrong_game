@@ -85,7 +85,7 @@ BACKEND_URL: str = getenvs(logger=app.logger)
 
 
 EXTS = (
-    ".akpg",
+    ".apkg",
     ".docx",
     ".pdf",
     ".txt",

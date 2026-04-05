@@ -114,8 +114,9 @@ def on_navigate(navigation_url: str | None, token: dict | None, user: str | None
     session: bool = token and user
     real: set = {"/files", "/account", "/", "/login", "/join"}
     protected: set = {"/files", "/account"}
+    is_game_path: bool = bool(navigation_url) and navigation_url.startswith("/game/") and len(navigation_url) > 7
 
-    if not navigation_url or navigation_url not in real:
+    if not navigation_url or (navigation_url not in real and not is_game_path):
         return "/"
     if navigation_url in protected and not session:
         return "/login"
