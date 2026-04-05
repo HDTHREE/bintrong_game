@@ -1,3 +1,4 @@
+"""Module that contains code pertaining to the files page."""
 import dash
 import base64
 import urllib.parse
@@ -93,6 +94,7 @@ EXTS = (
 
 
 layout: dmc.AppShellMain = dmc.AppShellMain(
+    style={"overflow": "hidden", "height": "100%"},
     children=dmc.Center(
         children=dmc.Card(
             children=dmc.Stack(
@@ -142,8 +144,15 @@ layout: dmc.AppShellMain = dmc.AppShellMain(
                         dmc.Fieldset(
                             children=[
                                 dmc.Title("YouTube transcript"),
-                                dmc.Text(size="xs", children="This video's transcript will be made available as a file."),
-                                youtube_text_input := dmc.TextInput(placeholder="https://www.youtube.com/watch?v=...", label="URL", required=True),
+                                dmc.Text(
+                                    size="xs",
+                                    children="This video's transcript will be made available as a file."
+                                ),
+                                youtube_text_input := dmc.TextInput(
+                                    placeholder="https://www.youtube.com/watch?v=...",
+                                    label="URL",
+                                    required=True
+                                ),
                                 dmc.Space(h=5),
                                 youtube_modal_submit_button := dmc.Button(children="Submit"),
                             ]
@@ -152,10 +161,10 @@ layout: dmc.AppShellMain = dmc.AppShellMain(
                 ]
             ),
             w="100vw",
-            h="100vh",
+            h="100%",
             style={"overflow": "hidden", "boxSizing": "border-box"},
         ),
-        h="100vh",
+        h="calc(100vh - 8vh)",
         style={"overflow": "hidden", "boxSizing": "border-box"},
     ),
 )
@@ -284,7 +293,7 @@ async def upload_file(contents: str, filename: str, token: dict):
     prevent_initial_call=True,
 )
 async def get_youtube_transcript(_: int, youtube_text_input_value: str | None, token: dict):
-    """Callback triggered when user submits a YouTube URL. Fetches the transcript via the backend."""
+    """Callback triggered when user submits a YouTube URL to have backend perform fetch."""
     if not youtube_text_input_value or not token or not token.get("access_token"):
         raise de.PreventUpdate()
     access_token: str = token["access_token"]
@@ -324,7 +333,7 @@ update_state_submit: ClientsideFunctionType = app.clientside_callback(
     dash.Output(youtube_modal_submit_button, "disabled"),
     dash.Input(youtube_text_input, "value"),
 )
-"""Callback to update the disabled/enabled state of the submit button on the youtube fetch moddal."""
+"""Callback to update the disabled/enabled state of the youtube fetch moddal submit button ."""
 
 
 open_youtube_modal: ClientsideFunctionType = app.clientside_callback(

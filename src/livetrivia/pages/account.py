@@ -1,3 +1,4 @@
+"""Module that contains code pertaining to the account page."""
 import dash
 import dash.exceptions as de
 import aiohttp
@@ -15,6 +16,7 @@ BACKEND_URL: str = getenvs(logger=app.logger)
 
 
 layout: dmc.AppShellMain = dmc.AppShellMain(
+    style={"overflow": "hidden", "height": "100%"},
     children=dmc.Center(
         children=dmc.Card(
             children=dmc.Fieldset(
@@ -36,7 +38,7 @@ layout: dmc.AppShellMain = dmc.AppShellMain(
             h="100%",
             mah="40vh",
         ),
-        h="100vh",
+        h="calc(100vh - 8vh)",
     )
 )
 """Layout for account page. Embedded into `livetrivia._app` at `dash.page_container`."""
@@ -53,7 +55,8 @@ layout: dmc.AppShellMain = dmc.AppShellMain(
 )
 async def on_signout(n_clicks: int | None, token: dict):
     """Callback that fires when the user clicks log out. Logs out session and deletes it."""
-    # This will fire on page load (regardless of the value of prevent_initial_call) so check if `None` for first trigger.
+    # This will fire on page load (regardless of the value of prevent_initial_call)
+    # so check if `None` for first trigger.
     if n_clicks is None or not token or not token.get("access_token"):
         raise de.PreventUpdate()
     access_token = token["access_token"]
