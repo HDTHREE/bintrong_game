@@ -1,6 +1,5 @@
 import html
 import random
-from enum import StrEnum
 from pathlib import Path
 import typing_extensions as tp
 
@@ -8,82 +7,23 @@ import genanki
 from pydantic import BaseModel, Field, model_validator
 
 
-class FlashcardModelName(StrEnum):
-    BASIC_MODEL = "BASIC_MODEL"
-    BASIC_AND_REVERSED_CARD_MODEL = "BASIC_AND_REVERSED_CARD_MODEL"
-    BASIC_OPTIONAL_REVERSED_CARD_MODEL = "BASIC_OPTIONAL_REVERSED_CARD_MODEL"
-    BASIC_TYPE_IN_THE_ANSWER_MODEL = "BASIC_TYPE_IN_THE_ANSWER_MODEL"
-    CLOZE_MODEL = "CLOZE_MODEL"
-
-
-GENANKI_MODEL_BY_NAME: dict[FlashcardModelName, genanki.Model] = {
-    FlashcardModelName.BASIC_MODEL: genanki.BASIC_MODEL,
-    FlashcardModelName.BASIC_AND_REVERSED_CARD_MODEL: genanki.BASIC_AND_REVERSED_CARD_MODEL,
-    FlashcardModelName.BASIC_OPTIONAL_REVERSED_CARD_MODEL: genanki.BASIC_OPTIONAL_REVERSED_CARD_MODEL,
-    FlashcardModelName.BASIC_TYPE_IN_THE_ANSWER_MODEL: genanki.BASIC_TYPE_IN_THE_ANSWER_MODEL,
-    FlashcardModelName.CLOZE_MODEL: genanki.CLOZE_MODEL,
-}
-
-
 class GeneratedFlashcard(BaseModel):
     """Structured generation payload returned by the inference service."""
 
-    model_name: FlashcardModelName
-    front: str | None = Field(
-        default=None,
-        description="Prompt shown on the front for non-cloze cards.",
-    )
-    back: str | None = Field(
-        default=None,
-        description="Answer shown on the back for non-cloze cards.",
-    )
-    add_reverse: bool = Field(
-        default=False,
-        description="Whether the optional reversed model should create the reverse card.",
-    )
-    text: str | None = Field(
-        default=None,
-        description="Cloze text containing one or more {{cN::...}} deletions.",
-    )
-    back_extra: str = Field(
-        default="",
-        description="Extra explanation shown on the back of cloze cards.",
-    )
+    front: str = Field(description="Prompt shown on the front of the card.")
+    back: str = Field(description="Answer shown on the back of the card.")
     tags: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def validate_required_fields(self) -> tp.Self:
-        data = self.model_dump()
-        text = data.get("text")
-        front = data.get("front")
-        back = data.get("back")
-
-        if self.model_name == FlashcardModelName.CLOZE_MODEL:
-            if not isinstance(text, str) or not text.strip():
-                raise ValueError("CLOZE_MODEL requires text")
-            return self
-
-        if not isinstance(front, str) or not front.strip():
-            raise ValueError(f"{self.model_name} requires front")
-        if not isinstance(back, str) or not back.strip():
-            raise ValueError(f"{self.model_name} requires back")
+    def validate_required_fields(self: tp.Self) -> "GeneratedFlashcard":
+        if not self.front.strip(): # pylint: disable=no-member
+            raise ValueError("front must not be empty")
+        if not self.back.strip(): # pylint: disable=no-member
+            raise ValueError("back must not be empty")
         return self
 
-    @property
-    def genanki_model(self) -> genanki.Model:
-        return GENANKI_MODEL_BY_NAME[self.model_name]
-
     def to_note_fields(self) -> list[str]:
-        if self.model_name == FlashcardModelName.BASIC_MODEL:
-            return [_format_field(self.front), _format_field(self.back)]
-        if self.model_name == FlashcardModelName.BASIC_AND_REVERSED_CARD_MODEL:
-            return [_format_field(self.front), _format_field(self.back)]
-        if self.model_name == FlashcardModelName.BASIC_OPTIONAL_REVERSED_CARD_MODEL:
-            add_reverse = "y" if self.add_reverse else ""
-            return [_format_field(self.front), _format_field(self.back), add_reverse]
-        if self.model_name == FlashcardModelName.BASIC_TYPE_IN_THE_ANSWER_MODEL:
-            return [_format_field(self.front), _format_field(self.back)]
-        return [_format_field(self.text), _format_field(self.back_extra)]
+        return [_format_field(self.front), _format_field(self.back)]
 
 
 def build_anki_package(
@@ -95,7 +35,7 @@ def build_anki_package(
     for index, flashcard in enumerate(flashcards):
         fields = flashcard.to_note_fields()
         note = genanki.Note(
-            model=flashcard.genanki_model,
+            model=genanki.BASIC_AND_REVERSED_CARD_MODEL,
             fields=fields,
             tags=_sanitize_tags(flashcard.tags),
             guid=genanki.guid_for(deck.deck_id, index, *fields),
