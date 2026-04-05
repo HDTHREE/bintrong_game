@@ -1,3 +1,5 @@
+let _gamePollInterval = null;
+
 globalThis.dash_clientside = {
 	...globalThis.dash_clientside,
 	game: {
@@ -6,8 +8,33 @@ globalThis.dash_clientside = {
 				return '';
 			}
 
+			if (_gamePollInterval !== null) {
+				clearInterval(_gamePollInterval);
+				_gamePollInterval = null;
+			}
+
 			const parts = pathname.split('/').filter(Boolean);
-			return `/gameserver/${parts.at(-1)}/`;
+			const src = `/gameserver/${parts.at(-1)}/`;
+
+			_gamePollInterval = setInterval(() => {
+				const iframe = document.querySelector('#game-embed');
+				if (!iframe) {
+					return;
+				}
+
+				try {
+					if (iframe.contentDocument?.title === 'Three.js + TypeScript') {
+						clearInterval(_gamePollInterval);
+						_gamePollInterval = null;
+					} else {
+						iframe.src = src;
+					}
+				} catch {
+					iframe.src = src;
+				}
+			}, 1000);
+
+			return src;
 		},
 	},
 };

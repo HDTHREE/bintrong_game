@@ -60,7 +60,9 @@ async def download_file(
     try:
         resp = await storage.get_object(Bucket=BUCKET_NAME, Key=key)
     except Exception as exc:
-        raise HTTPException(status_code=404, detail="object not found in storage") from exc
+        raise HTTPException(
+            status_code=404, detail="object not found in storage"
+        ) from exc
 
     body = resp.get("Body")
     if body is None:
@@ -99,7 +101,9 @@ async def delete_file(
     try:
         await storage.delete_object(Bucket=BUCKET_NAME, Key=key)
     except Exception as exc:
-        raise HTTPException(status_code=500, detail="failed to delete from storage") from exc
+        raise HTTPException(
+            status_code=500, detail="failed to delete from storage"
+        ) from exc
 
     await sql.delete(file)
     await sql.commit()
@@ -148,7 +152,9 @@ async def get_all_files_data(
             prefix=f.prefix,
             user_id=f.user_id,
             generated_from_id=f.generated_from_id,
-            generated_from_prefix=prefix_map.get(f.generated_from_id) if f.generated_from_id else None,
+            generated_from_prefix=prefix_map.get(f.generated_from_id)
+            if f.generated_from_id
+            else None,
         )
         for f in files
     ]
@@ -161,7 +167,7 @@ async def get_anki_files(
     user_id: CurrentUserId,
     sql: SqlSession,
 ) -> list[FileDataResponse]:
-    stmt = select(File).where(File.user_id == user_id, File.prefix.endswith(".apkg")) # pylint: disable=no-member
+    stmt = select(File).where(File.user_id == user_id, File.prefix.endswith(".apkg"))  # pylint: disable=no-member
     result = await sql.execute(stmt)
     files = result.scalars().all()
     prefix_map: dict[uuid.UUID, str] = {f.id: f.prefix for f in files}
@@ -171,7 +177,9 @@ async def get_anki_files(
             prefix=f.prefix,
             user_id=f.user_id,
             generated_from_id=f.generated_from_id,
-            generated_from_prefix=prefix_map.get(f.generated_from_id) if f.generated_from_id else None,
+            generated_from_prefix=prefix_map.get(f.generated_from_id)
+            if f.generated_from_id
+            else None,
         )
         for f in files
     ]

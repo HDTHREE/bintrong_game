@@ -1,4 +1,5 @@
 """Module that contains code pertaining to the account page."""
+
 import dash
 import dash.exceptions as de
 import aiohttp
@@ -39,7 +40,7 @@ layout: dmc.AppShellMain = dmc.AppShellMain(
             mah="40vh",
         ),
         h="calc(100vh - 8vh)",
-    )
+    ),
 )
 """Layout for account page. Embedded into `livetrivia._app` at `dash.page_container`."""
 

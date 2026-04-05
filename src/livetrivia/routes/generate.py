@@ -154,7 +154,9 @@ async def get_gen_text(
             raise HTTPException(status_code=403, detail="forbidden")
 
         ext = Path(file.prefix).suffix.lower()
-        if ("/scripts/" not in file.prefix) and (ext == ".apkg" or ext not in {".docx", ".pdf", ".txt"}):
+        if ("/scripts/" not in file.prefix) and (
+            ext == ".apkg" or ext not in {".docx", ".pdf", ".txt"}
+        ):
             raise HTTPException(status_code=422, detail="unprocessable body")
 
         resp = await s3.get_object(Bucket=BUCKET_NAME, Key=file.prefix)

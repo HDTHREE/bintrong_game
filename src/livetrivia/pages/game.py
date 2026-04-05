@@ -1,4 +1,5 @@
 """Module that contains code pertaining to the game page."""
+
 import dash
 import dash_mantine_components as dmc
 from livetrivia.utils import getmod, ClientsideFunctionType
@@ -11,10 +12,15 @@ layout: dmc.AppShellMain = dmc.AppShellMain(
     px=0,
     pb=0,
     style={"overflow": "hidden"},
-    children=dash.html.Embed(
+    children=dash.html.Iframe(
         id="game-embed",
         src="",
-        style={"width": "100%", "height": "calc(100vh - 8vh)", "border": "none", "display": "block"},
+        style={
+            "width": "100%",
+            "height": "calc(100vh - 8vh)",
+            "border": "none",
+            "display": "block",
+        },
     ),
 )
 """Layout for game page. Embedded into `livetrivia._app` at `dash.page_container`."""

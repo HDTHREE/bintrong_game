@@ -12,8 +12,6 @@ so any ``.conf`` file written here is picked up on the next nginx reload.
 import os
 import pathlib
 
-from nginx.config.api import Config, Location
-
 NGINX_CONF_PATH: str = os.getenv("NGINX_CONF_PATH", "/nginx_conf")
 
 
@@ -24,16 +22,19 @@ def _conf_file(game_code: str) -> pathlib.Path:
 def write_game_route(game_code: str) -> None:
     """Write a location block that proxies ``/gameserver/{game_code}/`` to the
     game server container."""
-    location = Location(
-        f"/gameserver/{game_code}/",
-        proxy_pass=f"http://gameserver_{game_code}:3000/",
-        proxy_http_version="1.1",
-        proxy_read_timeout="3600",
-        proxy_send_timeout="3600",
-    )
     conf_path = _conf_file(game_code)
     conf_path.parent.mkdir(parents=True, exist_ok=True)
-    conf_path.write_text(str(Config(location)))
+    conf_path.write_text(
+        f"location /gameserver/{game_code}/ {{\n"
+        f"    proxy_pass http://gameserver_{game_code}:3000/;\n"
+        f"    proxy_http_version 1.1;\n"
+        f"    proxy_set_header Upgrade $http_upgrade;\n"
+        f'    proxy_set_header Connection "upgrade";\n'
+        f"    proxy_set_header Host $host;\n"
+        f"    proxy_read_timeout 3600;\n"
+        f"    proxy_send_timeout 3600;\n"
+        f"}}\n"
+    )
 
 
 def remove_game_route(game_code: str) -> None:

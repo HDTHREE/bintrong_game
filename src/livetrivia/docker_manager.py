@@ -15,6 +15,10 @@ GAME_IMAGE
 NGINX_CONTAINER_NAME
     Name of the nginx container to signal after config changes.
     Default: ``livetrivia_nginx``
+COMPOSE_PROJECT_NAME
+    Docker Compose project name to stamp on spawned containers so that
+    ``docker compose down --remove-orphans`` cleans them up automatically.
+    Default: ``bintrong_game``
 """
 
 import io
@@ -29,6 +33,7 @@ from livetrivia.nginx_config import remove_game_route, write_game_route
 DOCKER_NETWORK: str = os.getenv("DOCKER_NETWORK", "livetrivia_net")
 GAME_IMAGE: str = os.getenv("GAME_IMAGE", "livetrivia-game:latest")
 NGINX_CONTAINER_NAME: str = os.getenv("NGINX_CONTAINER_NAME", "livetrivia_nginx")
+COMPOSE_PROJECT_NAME: str = os.getenv("COMPOSE_PROJECT_NAME", "bintrong_game")
 
 
 def _client() -> docker.DockerClient:
@@ -74,13 +79,15 @@ def spawn_game_server(game_code: str, file_bytes: bytes) -> None:
     except docker.errors.NotFound:
         container = client.containers.create(
             GAME_IMAGE,
-            ports={3000:3000},
+            # ports={3000:3000},
             name=name,
             network=DOCKER_NETWORK,
             detach=True,
             labels={
                 "managed-by": "livetrivia-api",
                 "game-code": game_code,
+                "com.docker.compose.project": COMPOSE_PROJECT_NAME,
+                "com.docker.compose.service": f"gameserver_{game_code}",
             },
         )
         container.put_archive("/app", tar_data)

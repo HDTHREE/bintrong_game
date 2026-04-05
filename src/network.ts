@@ -77,8 +77,11 @@ export type NetworkCallbacks = {
 let socket: Socket | undefined;
 
 export function connect(callbacks: NetworkCallbacks) {
-	// Connect to wherever the page was served from
-	socket = io();
+	// Connect to wherever the page was served from, resolving the socket.io
+	// path relative to the current page so nginx can route it to the correct
+	// game server container when accessed via a sub-path proxy.
+	const basePath = globalThis.location.pathname.replace(/\/$/, '');
+	socket = io({path: `${basePath}/socket.io/`});
 
 	socket.on('init', (payload: InitPayload) => {
 		callbacks.onInit(payload);

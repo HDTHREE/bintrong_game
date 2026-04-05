@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Module that contains layout & navigation callbacks. Embeds a `dcc.Component` to act as page."""
+
 try:
     from dotenv import load_dotenv
 
@@ -11,11 +12,16 @@ import dash_iconify as di
 import dash
 import dash.exceptions as de
 import dash_mantine_components as dmc
-from livetrivia.utils import ClientsideFunctionType, assets_folder, getenvs, pages_folder
+from livetrivia.utils import (
+    ClientsideFunctionType,
+    assets_folder,
+    getenvs,
+    pages_folder,
+)
 from livetrivia.shared_components import token_store, user_store, interval, url
 
 
-dash._dash_renderer._set_react_version("18.2.0") # pylint: disable=protected-access
+dash._dash_renderer._set_react_version("18.2.0")  # pylint: disable=protected-access
 
 
 app: dash.Dash = dash.Dash(
@@ -114,7 +120,11 @@ def on_navigate(navigation_url: str | None, token: dict | None, user: str | None
     session: bool = token and user
     real: set = {"/files", "/account", "/", "/login", "/join"}
     protected: set = {"/files", "/account"}
-    is_game_path: bool = bool(navigation_url) and navigation_url.startswith("/game/") and len(navigation_url) > 7
+    is_game_path: bool = (
+        bool(navigation_url)
+        and navigation_url.startswith("/game/")
+        and len(navigation_url) > 7
+    )
 
     if not navigation_url or (navigation_url not in real and not is_game_path):
         return "/"
@@ -135,7 +145,9 @@ def on_navigate(navigation_url: str | None, token: dict | None, user: str | None
     dash.Input(url, "pathname"),
     dash.Input(interval, "n_intervals"),
 )
-async def on_refresh(email: str | None, interval_id: str, token: dict, *_: str | int | None):
+async def on_refresh(
+    email: str | None, interval_id: str, token: dict, *_: str | int | None
+):
     """Callback that triggers when a user refreshes or navigates to ensure a valid session."""
     if dash.ctx.triggered_id != interval_id and token:
         raise de.PreventUpdate()
@@ -155,7 +167,7 @@ async def on_refresh(email: str | None, interval_id: str, token: dict, *_: str |
             # Fr, why is this not reasonable? The behavior is easily explained and consistent.
             # pylint standard is so ass; there no way to just have: "code might fail and idc" tf.
             # Reasonable if you could do broad-caught-exception but no.
-            return None, None # pylint: disable=lost-exception, return-in-finally
+            return None, None  # pylint: disable=lost-exception, return-in-finally
 
 
 if __name__ == "__main__":

@@ -1,4 +1,5 @@
 """Module that contains code pertaining to the files page."""
+
 import dash
 import base64
 import urllib.parse
@@ -13,7 +14,6 @@ from livetrivia.shared_components import token_store, user_store
 
 app: dash.Dash = dash.get_app()
 """Reference to global dash object."""
-
 
 
 _BASE_COLUMN_DEFS: list[dict[str]] = [
@@ -51,7 +51,7 @@ _BASE_COLUMN_DEFS: list[dict[str]] = [
 ]
 
 
-DEFAULT_COLUMN_DEFS: list[dict[str]]=[
+DEFAULT_COLUMN_DEFS: list[dict[str]] = [
     {
         "headerName": "File Name",
         "field": "prefix",
@@ -102,7 +102,7 @@ layout: dmc.AppShellMain = dmc.AppShellMain(
                     dmc.Flex(
                         children=[
                             dmc.Title("Your Files", order=2),
-                            show_ids_checkbox := dmc.Checkbox(label="Show IDs")
+                            show_ids_checkbox := dmc.Checkbox(label="Show IDs"),
                         ],
                         w="100%",
                         justify="space-between",
@@ -146,17 +146,20 @@ layout: dmc.AppShellMain = dmc.AppShellMain(
                                 dmc.Title("YouTube transcript"),
                                 dmc.Text(
                                     size="xs",
-                                    children="This video's transcript will be made available as a file."
+                                    children="This video's transcript will be made available as a file.",
                                 ),
                                 youtube_text_input := dmc.TextInput(
                                     placeholder="https://www.youtube.com/watch?v=...",
                                     label="URL",
-                                    required=True
+                                    required=True,
                                 ),
                                 dmc.Space(h=5),
-                                youtube_modal_submit_button := dmc.Button(children="Submit"),
+                                youtube_modal_submit_button := dmc.Button(
+                                    children="Submit"
+                                ),
                             ]
-                        ), keepMounted=True,
+                        ),
+                        keepMounted=True,
                     ),
                 ]
             ),
@@ -229,7 +232,9 @@ async def handle_file_action(
                 filename: str | None = None
                 cd: str | None = resp.headers.get("Content-Disposition")
                 if cd and "filename=" in cd:
-                    filename = urllib.parse.unquote(cd.split("filename=")[-1].strip('"'))
+                    filename = urllib.parse.unquote(
+                        cd.split("filename=")[-1].strip('"')
+                    )
                 else:
                     filename = row.get("prefix", "downloaded_file")
                     if "/" in filename:
@@ -292,7 +297,9 @@ async def upload_file(contents: str, filename: str, token: dict):
     dash.State(token_store, "data"),
     prevent_initial_call=True,
 )
-async def get_youtube_transcript(_: int, youtube_text_input_value: str | None, token: dict):
+async def get_youtube_transcript(
+    _: int, youtube_text_input_value: str | None, token: dict
+):
     """Callback triggered when user submits a YouTube URL to have backend perform fetch."""
     if not youtube_text_input_value or not token or not token.get("access_token"):
         raise de.PreventUpdate()
@@ -307,8 +314,6 @@ async def get_youtube_transcript(_: int, youtube_text_input_value: str | None, t
             if resp.status != 200:
                 raise de.PreventUpdate()
         return await _get_files_data(session, headers)
-    
-
 
 
 @app.callback(
@@ -337,7 +342,6 @@ update_state_submit: ClientsideFunctionType = app.clientside_callback(
 
 
 open_youtube_modal: ClientsideFunctionType = app.clientside_callback(
-
     dash.ClientsideFunction("files", "openYouTubeModal"),
     dash.Output(youtube_modal, "opened", allow_duplicate=True),
     dash.Input(youtube_button, "n_clicks"),

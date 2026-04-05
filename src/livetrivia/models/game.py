@@ -24,7 +24,9 @@ class Game(SQLModel, table=True):
     """Foreign key column: Anki file selected to drive this game's questions."""
 
     game_code: str | None = Field(
-        default_factory=fnt.partial(generate_random_string, length=6), unique=True, index=True
+        default_factory=fnt.partial(generate_random_string, length=6),
+        unique=True,
+        index=True,
     )
     """Column: Random 6 length alphebetic string that currently connects to this game."""
     status: Status = Field(default=Status.STARTING)

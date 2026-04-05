@@ -24,6 +24,7 @@ services:
       dockerfile: game.Dockerfile
       target: runtime
     image: livetrivia-game:latest
+    container_name: dummy
     command: echo 'Game build success'
 
   api:
@@ -54,6 +55,7 @@ services:
       GAME_IMAGE: livetrivia-game:latest
       NGINX_CONTAINER_NAME: livetrivia_nginx
       NGINX_CONF_PATH: /nginx_conf
+      COMPOSE_PROJECT_NAME: ${COMPOSE_PROJECT_NAME:-bintrong_game}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - nginx_config:/nginx_conf

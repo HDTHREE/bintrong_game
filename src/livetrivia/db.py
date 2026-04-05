@@ -24,7 +24,9 @@ SQL_URL, S3_URL, S3_REGION, BUCKET_NAME = getenvs(logger=logger)
 _USE_POSTGRES: bool = "postgresql" in SQL_URL
 
 if not _USE_POSTGRES and S3_URL is None:
-    raise RuntimeError("Cannot start livetrivia backend with current data storage configuration.")
+    raise RuntimeError(
+        "Cannot start livetrivia backend with current data storage configuration."
+    )
 
 
 async def get_sql_engine(

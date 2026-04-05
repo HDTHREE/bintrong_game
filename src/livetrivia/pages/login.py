@@ -108,7 +108,9 @@ async def on_signup(_: int, email: str | None, password: str | None):
         raise de.PreventUpdate()
     user: LoginRequest = LoginRequest(email=email, password=password)
     async with aiohttp.ClientSession(BACKEND_URL) as session:
-        async with session.post("api/users", json=user.model_dump()) as session_response:
+        async with session.post(
+            "api/users", json=user.model_dump()
+        ) as session_response:
             if session_response.status >= 400:
                 raise de.PreventUpdate()
         async with session.post(
@@ -151,7 +153,7 @@ update_state_login: ClientsideFunctionType = app.clientside_callback(
 """Callback to update the disabled/enabled state of the login button."""
 
 
-update_state_create: ClientsideFunctionType =  app.clientside_callback(
+update_state_create: ClientsideFunctionType = app.clientside_callback(
     dash.ClientsideFunction("login", "updateStateCreate"),
     dash.Output(create_button, "disabled"),
     dash.Input(email_input, "value"),

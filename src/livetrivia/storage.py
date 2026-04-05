@@ -9,7 +9,6 @@ The environment is inferred from the SQL connection URL: if it contains
 ``"postgresql"`` the class uses the DB backend; otherwise it uses S3.
 """
 
-
 import typing_extensions as tp
 import sqlalchemy.ext.asyncio as sqlas
 import sqlalchemy.orm as sqlorm
@@ -69,7 +68,9 @@ class StorageClient:
         sql_engine: sqlas.AsyncEngine | None = None,
     ) -> None:
         if s3 is None and sql_engine is None:
-            raise ValueError("StorageClient requires either an S3 client or a SQL engine.")
+            raise ValueError(
+                "StorageClient requires either an S3 client or a SQL engine."
+            )
         self._s3 = s3
         self._engine = sql_engine
 
@@ -116,7 +117,12 @@ class StorageClient:
             from botocore.exceptions import ClientError
 
             raise ClientError(
-                {"Error": {"Code": "NoSuchKey", "Message": "The specified key does not exist."}},
+                {
+                    "Error": {
+                        "Code": "NoSuchKey",
+                        "Message": "The specified key does not exist.",
+                    }
+                },
                 "GetObject",
             )
 

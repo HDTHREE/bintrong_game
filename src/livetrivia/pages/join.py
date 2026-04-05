@@ -1,4 +1,5 @@
 """Module that contains code pertaining to the join page."""
+
 import dash
 import dash.exceptions as de
 import aiohttp
@@ -47,10 +48,12 @@ layout: dmc.AppShellMain = dmc.AppShellMain(
                             preventGrowOverflow=True,
                             align="flex-end",
                             children=[
-                                questions_select := dmc.Select(maw="100%", label="Questions"),
+                                questions_select := dmc.Select(
+                                    maw="100%", label="Questions"
+                                ),
                                 host_button := dmc.Button(children="Host", maw="20%"),
-                            ]
-                        )
+                            ],
+                        ),
                     ]
                 ),
                 dmc.Space(h=5),
@@ -66,7 +69,7 @@ layout: dmc.AppShellMain = dmc.AppShellMain(
             mah="40vh",
         ),
         h="calc(100vh - 8vh)",
-    )
+    ),
 )
 """Layout for join page. Embedded into `livetrivia._app` at `dash.page_container`."""
 
@@ -119,7 +122,11 @@ async def on_join(n_clicks: int | None, game_code: str | None, token: dict | Non
     if not n_clicks:
         raise de.PreventUpdate()
     if not token or not token.get("access_token"):
-        return dash.no_update, "You must have a session to join a game.", {"display": "block"}
+        return (
+            dash.no_update,
+            "You must have a session to join a game.",
+            {"display": "block"},
+        )
     headers = {"Authorization": f"Bearer {token['access_token']}"}
     async with aiohttp.ClientSession(BACKEND_URL) as session:
         async with session.post(
@@ -146,13 +153,21 @@ async def on_host(n_clicks: int | None, file_id: str | None, token: dict | None)
     if not n_clicks:
         raise de.PreventUpdate()
     if not token or not token.get("access_token"):
-        return dash.no_update, "You must have a session to host a game.", {"display": "block"}
+        return (
+            dash.no_update,
+            "You must have a session to host a game.",
+            {"display": "block"},
+        )
     headers = {"Authorization": f"Bearer {token['access_token']}"}
     async with aiohttp.ClientSession(BACKEND_URL) as session:
         async with session.post("api/games/", headers=headers) as resp:
             if resp.status != 201:
                 data = await resp.json()
-                return dash.no_update, data.get("detail", "Failed to create game."), {"display": "block"}
+                return (
+                    dash.no_update,
+                    data.get("detail", "Failed to create game."),
+                    {"display": "block"},
+                )
             game = await resp.json()
         game_id = game["id"]
         game_code = game["game_code"]
@@ -161,11 +176,19 @@ async def on_host(n_clicks: int | None, file_id: str | None, token: dict | None)
         ) as resp:
             if resp.status != 200:
                 data = await resp.json()
-                return dash.no_update, data.get("detail", "Failed to set game file."), {"display": "block"}
+                return (
+                    dash.no_update,
+                    data.get("detail", "Failed to set game file."),
+                    {"display": "block"},
+                )
         async with session.post(f"api/games/{game_id}/start", headers=headers) as resp:
             if resp.status != 200:
                 data = await resp.json()
-                return dash.no_update, data.get("detail", "Failed to start game."), {"display": "block"}
+                return (
+                    dash.no_update,
+                    data.get("detail", "Failed to start game."),
+                    {"display": "block"},
+                )
     return f"/game/{game_code}", dash.no_update, dash.no_update
 
 

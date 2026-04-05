@@ -16,9 +16,9 @@ class GeneratedFlashcard(BaseModel):
 
     @model_validator(mode="after")
     def validate_required_fields(self: tp.Self) -> "GeneratedFlashcard":
-        if not self.front.strip(): # pylint: disable=no-member
+        if not self.front.strip():  # pylint: disable=no-member
             raise ValueError("front must not be empty")
-        if not self.back.strip(): # pylint: disable=no-member
+        if not self.back.strip():  # pylint: disable=no-member
             raise ValueError("back must not be empty")
         return self
 

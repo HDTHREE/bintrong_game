@@ -33,7 +33,9 @@ class Session(SQLModel, table=True):
 
     access_token_expires_at: datetime = Field(sa_column=Column(DateTime(timezone=True)))
     """Column: Expire time of access token."""
-    refresh_token_expires_at: datetime = Field(sa_column=Column(DateTime(timezone=True)))
+    refresh_token_expires_at: datetime = Field(
+        sa_column=Column(DateTime(timezone=True))
+    )
     """Column: Expire time of refresh token."""
 
     user: "User" = Relationship(back_populates="sessions")
