@@ -19,11 +19,7 @@ _BASE_COLUMN_DEFS: list[dict[str]] = [
     {
         "headerName": "Generate",
         "cellRenderer": "dmcButton",
-        "cellRendererParams": {
-            "rightIcon": "ic:baseline-attach-file",
-            "value": "Generate",
-            "color": "green",
-        },
+        "cellRendererParams": {"function": "generateParams(params)"},
         "field": "user_id",
         "colId": "Generate",
         "flex": 1,

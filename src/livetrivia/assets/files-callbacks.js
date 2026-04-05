@@ -11,15 +11,27 @@ globalThis.dash_clientside = { // eslint-disable-line camelcase
 globalThis.dashAgGridFunctions = {
 	...globalThis.dashAgGridFunctions,
 	originIdGetter: parameters => parameters?.data?.generated_from_id ?? 'None',
+	generateParams(parameters) {
+		const prefix = parameters.data?.prefix ?? '';
+		const isAnki = prefix.endsWith('.akpg') || prefix.endsWith('.apkg');
+		return {
+			rightIcon: 'ic:baseline-attach-file',
+			value: 'Generate',
+			color: 'green',
+			disabled: isAnki,
+		};
+	},
 };
 
 globalThis.dashAgGridComponentFunctions = {
 	originRenderer(props) {
 		const {prefix, generated_from_prefix: generatedFromPrefix} = props.data ?? {};
-		if (generatedFromPrefix?.includes("/scripts/")) {
-			return globalThis.dashAgGridComponentFunctions.nameRenderer({...props, data: {
-				...props.data, prefix: generatedFromPrefix
-			}})
+		if (generatedFromPrefix?.includes('/scripts/')) {
+			return globalThis.dashAgGridComponentFunctions.nameRenderer({
+				...props, data: {
+					...props.data, prefix: generatedFromPrefix,
+				},
+			});
 		}
 
 		if (generatedFromPrefix) {
@@ -94,6 +106,7 @@ globalThis.dashAgGridComponentFunctions = {
 				onClick,
 				variant: props.variant,
 				color: props.color,
+				disabled: props.disabled,
 				leftSection: leftIcon,
 				rightSection: rightIcon,
 				radius: props.radius,
