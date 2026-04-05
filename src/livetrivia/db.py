@@ -127,6 +127,9 @@ async def lifespan(_: "FastAPI") -> tp.AsyncGenerator[None, None]:
             await connection.run_sync(SQLModel.metadata.create_all)
     yield
 
+    from livetrivia.docker_manager import stop_all_game_servers
+    stop_all_game_servers()
+
 
 SqlSession: tp.TypeAlias = tp.Annotated[sqlas.AsyncSession, Depends(get_sql_session)]
 """SQLAlchemy Async Session dependency type alias. Provides an injected dependency for sql operations."""

@@ -114,6 +114,27 @@ def stop_game_server(game_code: str) -> None:
     _reload_nginx()
 
 
+def stop_all_game_servers() -> None:
+    """Stop and remove every container managed by this API (identified by the
+    ``managed-by: livetrivia-api`` label).  Called on API shutdown so that
+    game containers are cleaned up regardless of how the stack is brought down."""
+    client = _client()
+    containers = client.containers.list(
+        all=True, filters={"label": "managed-by=livetrivia-api"}
+    )
+    for container in containers:
+        game_code: str = container.labels.get("game-code", "")
+        try:
+            container.kill()
+            container.remove()
+        except docker.errors.NotFound:
+            pass
+        if game_code:
+            remove_game_route(game_code)
+    if containers:
+        _reload_nginx()
+
+
 def _reload_nginx() -> None:
     """Send SIGHUP to the nginx container so it gracefully reloads its config."""
     client = _client()
