@@ -114,7 +114,7 @@ async def join_game(
             status_code=status.HTTP_404_NOT_FOUND, detail="Game not found"
         )
 
-    if game.status != Status.STARTING:
+    if game.status not in (Status.STARTING, Status.RUNNING):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Game not joinable"
         )

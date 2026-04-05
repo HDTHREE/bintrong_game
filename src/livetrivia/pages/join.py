@@ -49,7 +49,7 @@ layout: dmc.AppShellMain = dmc.AppShellMain(
                             align="flex-end",
                             children=[
                                 questions_select := dmc.Select(
-                                    maw="100%", label="Questions"
+                                    maw="100%", label="Host", placeholder="questions.apkg"
                                 ),
                                 host_button := dmc.Button(children="Host", maw="20%"),
                             ],
