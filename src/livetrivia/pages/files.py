@@ -14,7 +14,7 @@ app: dash.Dash = dash.get_app()
 
 
 
-_BASE_COLUMN_DEFS=[
+_BASE_COLUMN_DEFS: list[dict[str]] = [
     {
         "headerName": "Delete",
         "cellRenderer": "dmcButton",
@@ -40,24 +40,25 @@ _BASE_COLUMN_DEFS=[
     },
 ]
 
-DEFAULT_COLUMN_DEFS=[
+
+DEFAULT_COLUMN_DEFS: list[dict[str]]=[
     {
         "headerName": "File Name",
         "field": "prefix",
         "flex": 3,
-        "valueGetter": {"function": "nameGetter(params)"},
+        "cellRenderer": "nameRenderer",
     },
     {
         "headerName": "Origin",
         "field": "generated_from_prefix",
         "flex": 3,
-        "valueGetter": {"function": "originGetter(params)"},
+        "cellRenderer": "originRenderer",
     },
     *_BASE_COLUMN_DEFS,
 ]
 
 
-ID_COLUMN_DEFS=[
+ID_COLUMN_DEFS: list[dict[str]] = [
     {"headerName": "File ID", "field": "id", "flex": 3},
     {
         "headerName": "Origin ID",

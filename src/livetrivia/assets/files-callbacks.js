@@ -1,6 +1,6 @@
 globalThis.dash_clientside = { // eslint-disable-line camelcase
 	...globalThis.dash_clientside, files: {
-		openUpload: _ => document.querySelector('input[type="file"]').click(),
+		openUpload: _ => document.querySelector('input[type="file"]').click(), // eslint-disable-line no-undef
 		updateStateSubmit: value => !value,
 		openYouTubeModal: _ => true,
 		closeYouTubeModal: _ => false,
@@ -10,49 +10,52 @@ globalThis.dash_clientside = { // eslint-disable-line camelcase
 
 globalThis.dashAgGridFunctions = {
 	...globalThis.dashAgGridFunctions,
-	nameGetter(parameters) {
-		// If the video is a transcript we are going to fetch the title of the youtube video.
-		const {prefix} = parameters.data;
-		const isTranscript = Boolean(prefix?.includes('/scripts/'));
-		if (isTranscript) {
-			const videoId = prefix.split('/scripts/')?.[1].split('/')?.[0];
-			if (!videoId) {
-				return '';
-			}
-
-			const request = new XMLHttpRequest();
-			request.open(
-				'GET',
-				`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`,
-				false,
-			);
-			request.send(null);
-
-			try {
-				const response = JSON.parse(request.responseText);
-				return response.title;
-			} catch {
-				return '';
-			}
-		}
-
-		return decodeURIComponent(prefix?.split('/')?.pop() ?? '');
-	},
-	originGetter(parameters) {
-		if (parameters.data.generated_from_prefix) {
-			return globalThis.dashAgGridComponentFunctions.nameGetter(parameters);
-		}
-
-		if (parameters.data.prefix?.includes('/scripts/')) {
-			return 'YouTube';
-		}
-
-		return 'Upload';
-	},
 	originIdGetter: parameters => parameters?.data?.generated_from_id ?? 'None',
 };
 
 globalThis.dashAgGridComponentFunctions = {
+	originRenderer(props) {
+		const {prefix, generated_from_prefix: generatedFromPrefix} = props.data ?? {};
+		if (generatedFromPrefix) {
+			return React.createElement('span', null, decodeURIComponent(generatedFromPrefix.split('/')?.pop() ?? '')); // eslint-disable-line no-undef
+		}
+
+		if (prefix?.includes('/scripts/')) {
+			return React.createElement('span', null, 'YouTube'); // eslint-disable-line no-undef
+		}
+
+		return React.createElement('span', null, 'Upload'); // eslint-disable-line no-undef
+	},
+	nameRenderer(props) {
+		const prefix = props.data?.prefix;
+		const isTranscript = Boolean(prefix?.includes('/scripts/'));
+		const videoId = isTranscript ? (prefix.split('/scripts/')?.[1]?.split('/')?.[0] ?? '') : '';
+
+		const [title, setTitle] = React.useState(''); // eslint-disable-line no-undef
+
+		React.useEffect(() => { // eslint-disable-line no-undef
+			if (!videoId) {
+				return;
+			}
+
+			const controller = new AbortController();
+			fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`, {signal: controller.signal})
+				.then(r => r.json())
+				.then(data => {
+					setTitle(data.title ?? '');
+				})
+				.catch(() => {});
+			return () => {
+				controller.abort();
+			};
+		}, [videoId]);
+
+		if (!isTranscript) {
+			return React.createElement('span', null, decodeURIComponent(prefix?.split('/')?.pop() ?? '')); // eslint-disable-line no-undef
+		}
+
+		return React.createElement('span', null, title); // eslint-disable-line no-undef
+	},
 	// Adapted from: https://www.dash-mantine-components.com/dash-ag-grid#example-2:-buttons
 	dmcButton(props) {
 		const {setData} = props;
