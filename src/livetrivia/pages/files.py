@@ -73,7 +73,8 @@ ID_COLUMN_DEFS: list[dict[str]] = [
         "headerName": "Origin ID",
         "field": "generated_from_id",
         "flex": 3,
-        "valueGetter": {"function": "originIdGetter(params)"},},
+        "cellRenderer": "originIdRenderer",
+    },
     *_BASE_COLUMN_DEFS,
 ]
 
@@ -133,8 +134,7 @@ layout: dmc.AppShellMain = dmc.AppShellMain(
                         dashGridOptions={
                             "pagination": True,
                             "paginationPageSize": 10,
-                            "paginationPageSizeOptions": [10, 25, 50, 100],
-                            "paginationMaxPageSize": 100,
+                            "paginationPageSizeSelector": [10, 25, 50, 100],
                         },
                     ),
                     download := dash.dcc.Download(),

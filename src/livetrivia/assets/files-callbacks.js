@@ -8,6 +8,31 @@ globalThis.dash_clientside = { // eslint-disable-line camelcase
 	},
 };
 
+function goToFileRow(api, fileId) {
+	if (!api || !fileId) {
+		return;
+	}
+
+	let targetNode = null;
+	api.forEachNode(node => {
+		if (node.data?.id === fileId) {
+			targetNode = node;
+		}
+	});
+	if (!targetNode) {
+		return;
+	}
+
+	const page = Math.floor(targetNode.rowIndex / api.paginationGetPageSize());
+	api.paginationGoToPage(page);
+	api.deselectAll();
+	targetNode.setSelected(true);
+	api.ensureIndexVisible(targetNode.rowIndex, 'middle');
+	setTimeout(() => {
+		targetNode.setSelected(false);
+	}, 3000);
+}
+
 globalThis.dashAgGridFunctions = {
 	...globalThis.dashAgGridFunctions,
 	originIdGetter: parameters => parameters?.data?.generated_from_id ?? 'None',
@@ -25,7 +50,8 @@ globalThis.dashAgGridFunctions = {
 
 globalThis.dashAgGridComponentFunctions = {
 	originRenderer(props) {
-		const {prefix, generated_from_prefix: generatedFromPrefix} = props.data ?? {};
+		console.log(props);
+		const {prefix, generated_from_id: generatedFromId, generated_from_prefix: generatedFromPrefix} = props.data ?? {};
 		if (generatedFromPrefix?.includes('/scripts/')) {
 			return globalThis.dashAgGridComponentFunctions.nameRenderer({
 				...props, data: {
@@ -35,7 +61,12 @@ globalThis.dashAgGridComponentFunctions = {
 		}
 
 		if (generatedFromPrefix) {
-			return React.createElement('span', null, decodeURIComponent(generatedFromPrefix.split('/')?.pop() ?? '')); // eslint-disable-line no-undef
+			const onClick = () => goToFileRow(props.api, generatedFromId);
+			return React.createElement( // eslint-disable-line no-undef
+				'span',
+				{onClick, style: {cursor: 'pointer', textDecoration: 'underline'}},
+				decodeURIComponent(generatedFromPrefix.split('/')?.pop() ?? ''),
+			);
 		}
 
 		if (prefix?.includes('/scripts/')) {
@@ -43,6 +74,23 @@ globalThis.dashAgGridComponentFunctions = {
 		}
 
 		return React.createElement('span', null, 'Upload'); // eslint-disable-line no-undef
+	},
+	originIdRenderer(props) {
+		const {generated_from_id: generatedFromId, generated_from_prefix: generatedFromPrefix} = props.data ?? {};
+		if (!generatedFromId) {
+			return React.createElement('span', null, 'None'); // eslint-disable-line no-undef
+		}
+
+		if (generatedFromPrefix?.includes('/scripts/')) {
+			return React.createElement('span', null, generatedFromId); // eslint-disable-line no-undef
+		}
+
+		const onClick = () => goToFileRow(props.api, generatedFromId);
+		return React.createElement( // eslint-disable-line no-undef
+			'span',
+			{onClick, style: {cursor: 'pointer', textDecoration: 'underline'}},
+			generatedFromId,
+		);
 	},
 	nameRenderer(props) {
 		const prefix = props.data?.prefix;
@@ -57,15 +105,11 @@ globalThis.dashAgGridComponentFunctions = {
 			}
 
 			const controller = new AbortController();
-			fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`, {signal: controller.signal})
-				.then(r => r.json())
-				.then(data => {
-					setTitle(data.title ?? '');
-				})
-				.catch(() => {});
-			return () => {
-				controller.abort();
-			};
+			fetch(
+				`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`,
+				{signal: controller.signal},
+			).then(r => r.json()).then(data => setTitle(data?.title ?? '')).catch(() => {});
+			return () => controller.abort();
 		}, [videoId]);
 
 		if (!isTranscript) {
