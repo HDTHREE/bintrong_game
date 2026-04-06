@@ -31,6 +31,7 @@ dash._dash_renderer._set_react_version("18.2.0")  # pylint: disable=protected-ac
 
 
 app: dash.Dash = dash.Dash(
+    title="Binturong Game",
     use_pages=True,
     pages_folder=pages_folder,
     assets_folder=assets_folder,

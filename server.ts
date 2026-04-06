@@ -79,7 +79,15 @@ type AnkiCollectionLike = {
 	}>;
 };
 
+type ScoreboardRow = {
+	playerNumber: number;
+	score: number;
+	status: 'alive' | 'dead' | 'left';
+};
+
 const players = new Map<string, PlayerState>();
+const scoreboard = new Map<string, ScoreboardRow>();
+let nextPlayerNumber = 1;
 
 const modelFiles = [
 	'Colobus_Animations.glb',
@@ -135,12 +143,14 @@ let phaseEndsAt = 0;
 let lastStateBroadcastAt = 0;
 let awaitingHostDecision = false;
 let hostDecisionKind: 'initial' | 'replay' = 'initial';
+let hostLeft = false;
+let gameEnding = false;
 let nextObstacleId = 1;
 const obstacles = new Map<string, ObstacleState>();
 
 const apiUrl = process.env.BEARCAT_API_URL ?? '';
 const gameId = process.env.BEARCAT_GAME_ID ?? '';
-let currentRoundId: string | undefined = null;
+let currentRoundId: string | null = null;
 
 let roundState: RoundState = {
 	phase: 'waiting',
@@ -260,6 +270,11 @@ function broadcastRoundState(force = false) {
 	io.emit('roundState', roundState);
 }
 
+function broadcastScoreboard() {
+	const rows = [...scoreboard.values()].sort((a, b) => a.playerNumber - b.playerNumber);
+	io.emit('scoreboard', rows);
+}
+
 function getWrongAnswers(correctAnswer: string, count: number): string[] {
 	const answerPool = uniqueNonEmpty(triviaCards.map(card => card.answer));
 	const candidates = shuffle(answerPool.filter(answer => answer !== correctAnswer));
@@ -350,21 +365,6 @@ function getHostPlayer(): PlayerState | undefined {
 	}
 
 	return undefined;
-}
-
-function ensureHostAssigned() {
-	const host = getHostPlayer();
-	if (host || players.size === 0) {
-		return;
-	}
-
-	const nextHost = players.values().next().value as PlayerState | undefined;
-	if (!nextHost) {
-		return;
-	}
-
-	nextHost.host = true;
-	io.emit('playerMoved', nextHost);
 }
 
 function clampToPlatform(value: number): number {
@@ -684,6 +684,11 @@ function tickObstacles() {
 }
 
 function startHostDecisionPrompt(kind: 'initial' | 'replay') {
+	if (hostLeft) {
+		endGame();
+		return;
+	}
+
 	awaitingHostDecision = true;
 	hostDecisionKind = kind;
 	roundState = {
@@ -719,6 +724,13 @@ function restartGame() {
 		io.emit('playerMoved', player);
 	}
 
+	for (const row of scoreboard.values()) {
+		if (row.status !== 'left') {
+			row.status = 'alive';
+		}
+	}
+
+	broadcastScoreboard();
 	startQuestionRound();
 }
 
@@ -775,7 +787,13 @@ function eliminatePlayersOutsideCorrectZone() {
 		player.dead = true;
 		player.animation = 'idle';
 		io.emit('playerMoved', player);
+		const sbEntry = scoreboard.get(player.id);
+		if (sbEntry && sbEntry.status === 'alive') {
+			sbEntry.status = 'dead';
+		}
 	}
+
+	broadcastScoreboard();
 }
 
 function startBreakRound() {
@@ -795,12 +813,8 @@ function tickRoundLoop() {
 	tickObstacles();
 
 	if (awaitingHostDecision) {
-		if (!getHostPlayer()) {
-			ensureHostAssigned();
-			const reassignedHost = getHostPlayer();
-			if (reassignedHost) {
-				io.to(reassignedHost.id).emit('hostGamePrompt', {initialStart: hostDecisionKind === 'initial'});
-			}
+		if (hostLeft) {
+			endGame();
 		}
 
 		return;
@@ -841,6 +855,16 @@ function tickRoundLoop() {
 		if (timeLeftMs <= 0) {
 			eliminatePlayersOutsideCorrectZone();
 			spawnObstacleAtRoundEnd(roundState.round);
+			for (const p of players.values()) {
+				if (!p.dead) {
+					const sbEntry = scoreboard.get(p.id);
+					if (sbEntry) {
+						sbEntry.score++;
+					}
+				}
+			}
+
+			broadcastScoreboard();
 			if (gameId && currentRoundId) {
 				for (const p of players.values()) {
 					if (!p.dead && p.gamePlayerId) {
@@ -982,6 +1006,31 @@ async function callApi(method: string, path: string, body?: unknown): Promise<Re
 	});
 }
 
+function endGame() {
+	if (gameEnding) {
+		return;
+	}
+
+	gameEnding = true;
+	io.emit('roundState', {
+		phase: 'waiting',
+		round: roundState.round,
+		question: 'The game has ended.',
+		timeLeftMs: 0,
+		revealedAnswerCount: 0,
+		zones: [],
+	} satisfies RoundState);
+	io.emit('gameEnded');
+
+	if (gameId) {
+		void callApi('POST', `/api/games/${gameId}/server-end`);
+	}
+
+	setTimeout(() => {
+		process.exit(0);
+	}, 200);
+}
+
 io.on('connection', socket => {
 	console.log(`Player connected: ${socket.id}`);
 	const isFirstPlayer = players.size === 0;
@@ -1000,7 +1049,12 @@ io.on('connection', socket => {
 		gamePlayerId: typeof rawGamePlayerId === 'string' ? rawGamePlayerId : undefined,
 	};
 	players.set(socket.id, newPlayer);
-	ensureHostAssigned();
+	scoreboard.set(socket.id, {
+		playerNumber: nextPlayerNumber++,
+		score: 0,
+		status: 'alive',
+	});
+	broadcastScoreboard();
 
 	socket.emit('init', {
 		id: socket.id,
@@ -1137,22 +1191,22 @@ io.on('connection', socket => {
 
 	socket.on('disconnect', () => {
 		console.log(`Player disconnected: ${socket.id}`);
+		const wasHost = players.get(socket.id)?.host ?? false;
 		players.delete(socket.id);
-		io.emit('playerLeft', socket.id);
-		ensureHostAssigned();
-
-		if (players.size === 0) {
-			awaitingHostDecision = false;
-			setWaitingState('Waiting for players...');
-			broadcastRoundState(true);
-			return;
+		const sbEntry = scoreboard.get(socket.id);
+		if (sbEntry) {
+			sbEntry.status = 'left';
 		}
 
-		if (awaitingHostDecision) {
-			const host = getHostPlayer();
-			if (host) {
-				io.to(host.id).emit('hostGamePrompt', {initialStart: hostDecisionKind === 'initial'});
-			}
+		io.emit('playerLeft', socket.id);
+		broadcastScoreboard();
+
+		if (wasHost) {
+			hostLeft = true;
+		}
+
+		if (players.size === 0) {
+			endGame();
 		}
 	});
 });

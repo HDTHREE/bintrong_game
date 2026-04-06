@@ -8,6 +8,7 @@ import {
 	type RemotePlayerData,
 	type RoundState,
 	type ObstacleData,
+	type ScoreboardRow,
 } from './network';
 
 const scene = new THREE.Scene();
@@ -71,6 +72,41 @@ roundQuestion.textContent = 'Waiting for first question';
 
 roundHud.append(roundTimer, roundQuestion);
 document.body.append(roundHud);
+
+const scoreboardEl = document.createElement('div');
+scoreboardEl.style.position = 'fixed';
+scoreboardEl.style.top = '18px';
+scoreboardEl.style.right = '14px';
+scoreboardEl.style.padding = '8px 12px';
+scoreboardEl.style.background = 'rgba(0, 0, 0, 0.45)';
+scoreboardEl.style.border = '1px solid rgba(255, 255, 255, 0.2)';
+scoreboardEl.style.borderRadius = '10px';
+scoreboardEl.style.color = '#ffffff';
+scoreboardEl.style.fontFamily = '"Trebuchet MS", Verdana, sans-serif';
+scoreboardEl.style.fontSize = '0.88rem';
+scoreboardEl.style.backdropFilter = 'blur(2px)';
+scoreboardEl.style.pointerEvents = 'none';
+scoreboardEl.style.zIndex = '1000';
+scoreboardEl.style.minWidth = '140px';
+document.body.append(scoreboardEl);
+
+function renderScoreboard(rows: ScoreboardRow[]) {
+	const statusIcon: Record<ScoreboardRow['status'], string> = {
+		alive: '❤️',
+		dead: '💀',
+		left: '❓',
+	};
+
+	scoreboardEl.innerHTML = rows
+		.map(
+			row =>
+				`<div style="display:flex;justify-content:space-between;gap:12px;padding:2px 0">`
+				+ `<span>Player ${row.playerNumber}</span>`
+				+ `<span>${statusIcon[row.status]} ${row.score}</span>`
+				+ `</div>`,
+		)
+		.join('');
+}
 
 const hostDecisionOverlay = document.createElement('div');
 hostDecisionOverlay.textContent = 'Waiting for host';
@@ -1373,6 +1409,9 @@ connect({
 	},
 	onObstaclesState(obstacles) {
 		syncObstacles(obstacles);
+	},
+	onScoreboard(rows) {
+		renderScoreboard(rows);
 	},
 	onGameEnded() {
 		window.parent?.postMessage({type: 'gameEnded'}, '*');

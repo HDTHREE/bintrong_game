@@ -62,6 +62,12 @@ export type ObstacleData = {
 	velocityZ: number;
 };
 
+export type ScoreboardRow = {
+	playerNumber: number;
+	score: number;
+	status: 'alive' | 'dead' | 'left';
+};
+
 export type NetworkCallbacks = {
 	onInit: (payload: InitPayload) => void;
 	onPlayerJoined: (player: RemotePlayerData) => void;
@@ -72,6 +78,7 @@ export type NetworkCallbacks = {
 	onRoundState: (state: RoundState) => void;
 	onHostGamePrompt: (payload: {initialStart: boolean}) => void;
 	onObstaclesState: (obstacles: ObstacleData[]) => void;
+	onScoreboard: (rows: ScoreboardRow[]) => void;
 	onGameEnded: () => void;
 };
 
@@ -118,6 +125,10 @@ export function connect(callbacks: NetworkCallbacks, gamePlayerId: string) {
 
 	socket.on('obstaclesState', (obstacles: ObstacleData[]) => {
 		callbacks.onObstaclesState(obstacles);
+	});
+
+	socket.on('scoreboard', (rows: ScoreboardRow[]) => {
+		callbacks.onScoreboard(rows);
 	});
 
 	socket.on('gameEnded', () => {

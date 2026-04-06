@@ -9,7 +9,8 @@ src/main.ts
 src/network.ts
 src/components
 public
-poster
+poster/**
+!poster/logo.svg
 models
 questions.apkg
 *.apkg
