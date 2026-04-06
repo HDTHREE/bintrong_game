@@ -20,6 +20,7 @@ layout: dmc.AppShellMain = dmc.AppShellMain(
             "height": "calc(100vh - 8vh)",
             "border": "none",
             "display": "block",
+            "visibility": "hidden",
         },
     ),
 )

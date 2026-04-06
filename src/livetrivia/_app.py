@@ -108,6 +108,14 @@ set_style: ClientsideFunctionType = app.clientside_callback(
 """Callback to toggle between displaying the login/account tab at the top."""
 
 
+set_files_disabled: ClientsideFunctionType = app.clientside_callback(
+    dash.ClientsideFunction("layout", "setFilesDisabled"),
+    dash.Output(files_link, "disabled"),
+    dash.Input(user_store, "data"),
+)
+"""Callback to disable the files nav link for guest users."""
+
+
 @app.callback(
     dash.Output(url, "pathname"),
     dash.Input(url, "pathname"),

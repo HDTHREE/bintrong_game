@@ -24,12 +24,15 @@ globalThis.dash_clientside = {
 
 				try {
 					if (iframe.contentDocument?.title === 'Three.js + TypeScript') {
+						iframe.style.visibility = 'visible';
 						clearInterval(_gamePollInterval);
 						_gamePollInterval = null;
 					} else {
+						iframe.style.visibility = 'hidden';
 						iframe.src = src;
 					}
 				} catch {
+					iframe.style.visibility = 'hidden';
 					iframe.src = src;
 				}
 			}, 1000);
