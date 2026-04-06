@@ -213,6 +213,10 @@ async def start_game(
     return game
 
 
+class EndGameRequest(BaseModel):
+    force: bool = False
+
+
 @router.post(
     "/{game_id}/end", response_model=GameResponse, status_code=status.HTTP_200_OK
 )
@@ -220,6 +224,7 @@ async def end_game(
     game_id: uuid.UUID,
     sql: SqlSession,
     credentials: BearerCredentials,
+    body: EndGameRequest = EndGameRequest(),
 ) -> Game:
     access_token = credentials.credentials
     user_id = verify_token(access_token, token_type="access")
@@ -256,7 +261,7 @@ async def end_game(
             detail="Only the game host can end the game",
         )
 
-    if game.status != Status.RUNNING:
+    if not body.force and game.status != Status.RUNNING:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Game must be in RUNNING status to end",

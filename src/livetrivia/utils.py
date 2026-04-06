@@ -126,7 +126,7 @@ def getmod(dunder_name: str) -> str:
 
 
 def generate_random_string(length: int) -> str:
-    characters = string.ascii_letters + string.digits
+    characters = string.ascii_uppercase + string.digits
     return "".join(random.choice(characters) for _ in range(length))
 
 

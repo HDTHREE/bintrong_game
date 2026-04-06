@@ -127,6 +127,7 @@ async def on_join(n_clicks: int | None, game_code: str | None, token: dict | Non
             "You must have a session to join a game.",
             {"display": "block"},
         )
+    game_code = game_code.upper()
     headers = {"Authorization": f"Bearer {token['access_token']}"}
     async with aiohttp.ClientSession(BACKEND_URL) as session:
         async with session.post(
@@ -176,6 +177,9 @@ async def on_host(n_clicks: int | None, file_id: str | None, token: dict | None)
         ) as resp:
             if resp.status != 200:
                 data = await resp.json()
+                await session.post(
+                    f"api/games/{game_id}/end", json={"force": True}, headers=headers
+                )
                 return (
                     dash.no_update,
                     data.get("detail", "Failed to set game file."),
@@ -184,6 +188,9 @@ async def on_host(n_clicks: int | None, file_id: str | None, token: dict | None)
         async with session.post(f"api/games/{game_id}/start", headers=headers) as resp:
             if resp.status != 200:
                 data = await resp.json()
+                await session.post(
+                    f"api/games/{game_id}/end", json={"force": True}, headers=headers
+                )
                 return (
                     dash.no_update,
                     data.get("detail", "Failed to start game."),
