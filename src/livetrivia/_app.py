@@ -18,7 +18,7 @@ from livetrivia.utils import (
     getenvs,
     pages_folder,
 )
-from livetrivia.shared_components import token_store, user_store, interval, url
+from livetrivia.shared_components import token_store, user_store, interval, url, game_player_store
 
 
 dash._dash_renderer._set_react_version("18.2.0")  # pylint: disable=protected-access
@@ -85,6 +85,7 @@ app.layout = dmc.MantineProvider(
             dash.page_container,
             token_store,
             user_store,
+            game_player_store,
             interval,
         ],
     )

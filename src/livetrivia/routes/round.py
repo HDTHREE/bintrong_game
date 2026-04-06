@@ -6,7 +6,7 @@ import uuid
 
 from livetrivia.db import SqlSession
 from livetrivia.models.round import Round
-from livetrivia.models.game import Game
+from livetrivia.models.game import Game, GamePlayer
 from livetrivia.models.session import Session
 from livetrivia.models.status import Status
 from livetrivia.jwt_utils import verify_token
@@ -22,9 +22,14 @@ class RoundResponse(BaseModel):
     created_at: datetime
     started_at: datetime | None
     ended_at: datetime | None
+    winner_id: uuid.UUID | None
 
     class Config:
         from_attributes = True
+
+
+class EndRoundRequest(BaseModel):
+    winner_id: uuid.UUID | None = None
 
 
 @router.post(
@@ -158,6 +163,7 @@ async def end_round(
     round_id: uuid.UUID,
     sql: SqlSession,
     credentials: BearerCredentials,
+    body: EndRoundRequest = EndRoundRequest(),
 ) -> Round:
     access_token = credentials.credentials
     user_id = verify_token(access_token, token_type="access")
@@ -208,6 +214,132 @@ async def end_round(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Round must be in RUNNING status to end",
         )
+
+    if body.winner_id is not None:
+        stmt = select(GamePlayer).where(
+            (GamePlayer.id == body.winner_id) & (GamePlayer.game_id == round_obj.game_id)
+        )
+        result = await sql.execute(stmt)
+        if not result.scalars().first():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Winner must be a player in this game",
+            )
+        round_obj.winner_id = body.winner_id
+
+    round_obj.status = Status.ENDED
+    round_obj.ended_at = datetime.now()
+    sql.add(round_obj)
+    await sql.commit()
+    await sql.refresh(round_obj)
+
+    return round_obj
+
+
+@router.post(
+    "/{game_id}/server-create", response_model=RoundResponse, status_code=status.HTTP_201_CREATED
+)
+async def server_create_round(
+    game_id: uuid.UUID,
+    sql: SqlSession,
+) -> Round:
+    stmt = select(Game).where(Game.id == game_id)
+    result = await sql.execute(stmt)
+    game = result.scalars().first()
+
+    if not game:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Game not found"
+        )
+
+    if game.status != Status.RUNNING:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Rounds can only be created for games in RUNNING status",
+        )
+
+    new_round = Round(game_id=game.id)
+    sql.add(new_round)
+    await sql.commit()
+    await sql.refresh(new_round)
+
+    return new_round
+
+
+@router.post(
+    "/{round_id}/server-start", response_model=RoundResponse, status_code=status.HTTP_200_OK
+)
+async def server_start_round(
+    round_id: uuid.UUID,
+    sql: SqlSession,
+) -> Round:
+    stmt = select(Round).where(Round.id == round_id)
+    result = await sql.execute(stmt)
+    round_obj = result.scalars().first()
+
+    if not round_obj:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Round not found"
+        )
+
+    if round_obj.status != Status.STARTING:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Round must be in STARTING status to start",
+        )
+
+    round_obj.status = Status.RUNNING
+    round_obj.started_at = datetime.now()
+    sql.add(round_obj)
+    await sql.commit()
+    await sql.refresh(round_obj)
+
+    return round_obj
+
+
+@router.post(
+    "/{round_id}/server-end", response_model=RoundResponse, status_code=status.HTTP_200_OK
+)
+async def server_end_round(
+    round_id: uuid.UUID,
+    sql: SqlSession,
+    body: EndRoundRequest = EndRoundRequest(),
+) -> Round:
+    stmt = select(Round).where(Round.id == round_id)
+    result = await sql.execute(stmt)
+    round_obj = result.scalars().first()
+
+    if not round_obj:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Round not found"
+        )
+
+    stmt = select(Game).where(Game.id == round_obj.game_id)
+    result = await sql.execute(stmt)
+    game = result.scalars().first()
+
+    if not game:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Game not found"
+        )
+
+    if round_obj.status != Status.RUNNING:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Round must be in RUNNING status to end",
+        )
+
+    if body.winner_id is not None:
+        stmt = select(GamePlayer).where(
+            (GamePlayer.id == body.winner_id) & (GamePlayer.game_id == round_obj.game_id)
+        )
+        result = await sql.execute(stmt)
+        if not result.scalars().first():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Winner must be a player in this game",
+            )
+        round_obj.winner_id = body.winner_id
 
     round_obj.status = Status.ENDED
     round_obj.ended_at = datetime.now()

@@ -1,9 +1,15 @@
 let _gamePollInterval = null;
 
+window.addEventListener('message', event => {
+	if (event.data?.type === 'gameEnded') {
+		window._livetrivia_gameEnded = true;
+	}
+});
+
 globalThis.dash_clientside = {
 	...globalThis.dash_clientside,
 	game: {
-		setGameSrc(pathname) {
+		setGameSrc(pathname, gamePlayerData) {
 			if (!pathname) {
 				return '';
 			}
@@ -14,7 +20,8 @@ globalThis.dash_clientside = {
 			}
 
 			const parts = pathname.split('/').filter(Boolean);
-			const src = `/gameserver/${parts.at(-1)}/`;
+			const gamePlayerId = gamePlayerData?.id ?? '';
+			const src = `/gameserver/${parts.at(-1)}/?gamePlayerId=${encodeURIComponent(gamePlayerId)}`;
 
 			_gamePollInterval = setInterval(() => {
 				const iframe = document.querySelector('#game-embed');
@@ -38,6 +45,14 @@ globalThis.dash_clientside = {
 			}, 1000);
 
 			return src;
+		},
+		pollGameEnded(_n) {
+			if (window._livetrivia_gameEnded) {
+				window._livetrivia_gameEnded = false;
+				return '/join';
+			}
+
+			return window.dash_clientside.no_update;
 		},
 	},
 };

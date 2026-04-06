@@ -26,6 +26,7 @@ type PlayerState = {
 	modelFile: string;
 	dead: boolean;
 	host: boolean;
+	gamePlayerId?: string;
 };
 
 type TriviaCard = {
@@ -136,6 +137,10 @@ let awaitingHostDecision = false;
 let hostDecisionKind: 'initial' | 'replay' = 'initial';
 let nextObstacleId = 1;
 const obstacles = new Map<string, ObstacleState>();
+
+const apiUrl = process.env.BEARCAT_API_URL ?? '';
+const gameId = process.env.BEARCAT_GAME_ID ?? '';
+let currentRoundId: string | null = null;
 
 let roundState: RoundState = {
 	phase: 'waiting',
@@ -836,6 +841,21 @@ function tickRoundLoop() {
 		if (timeLeftMs <= 0) {
 			eliminatePlayersOutsideCorrectZone();
 			spawnObstacleAtRoundEnd(roundState.round);
+			if (gameId && currentRoundId) {
+				for (const p of players.values()) {
+					if (!p.dead && p.gamePlayerId) {
+						void callApi('POST', `/api/games/${gameId}/${p.gamePlayerId}/score`);
+					}
+				}
+
+				if (alivePlayerCount() === 0) {
+					const anyPlayer = [...players.values()][0];
+					void callApi('POST', `/api/rounds/${currentRoundId}/server-end`, {
+						winner_id: anyPlayer?.gamePlayerId ?? null,
+					});
+				}
+			}
+
 			if (alivePlayerCount() === 0) {
 				startHostDecisionPrompt('replay');
 				return;
@@ -954,9 +974,18 @@ if (process.env.BEARCAT_GAME_DEBUG) {
 	console.log('Debug page enabled at /debug');
 }
 
+async function callApi(method: string, path: string, body?: unknown): Promise<Response> {
+	return fetch(`${apiUrl}${path}`, {
+		method,
+		headers: {'Content-Type': 'application/json'},
+		body: body === undefined ? undefined : JSON.stringify(body),
+	});
+}
+
 io.on('connection', socket => {
 	console.log(`Player connected: ${socket.id}`);
 	const isFirstPlayer = players.size === 0;
+	const rawGamePlayerId = socket.handshake.auth?.gamePlayerId;
 	const newPlayer: PlayerState = {
 		id: socket.id,
 		x: (Math.random() * 2 - 1) * spawnRange,
@@ -968,6 +997,7 @@ io.on('connection', socket => {
 		modelFile: pickModel(),
 		dead: false,
 		host: isFirstPlayer,
+		gamePlayerId: typeof rawGamePlayerId === 'string' ? rawGamePlayerId : undefined,
 	};
 	players.set(socket.id, newPlayer);
 	ensureHostAssigned();
@@ -1063,13 +1093,24 @@ io.on('connection', socket => {
 		});
 	});
 
-	socket.on('hostGameDecision', (data: {startGame: boolean}) => {
+	socket.on('hostGameDecision', async (data: {startGame: boolean}) => {
 		const host = getHostPlayer();
 		if (!awaitingHostDecision || !host || host.id !== socket.id) {
 			return;
 		}
 
 		if (data.startGame) {
+			if (gameId) {
+				try {
+					const createResp = await callApi('POST', `/api/rounds/${gameId}/server-create`);
+					const createData = await createResp.json() as {id: string};
+					currentRoundId = createData.id;
+					await callApi('POST', `/api/rounds/${currentRoundId}/server-start`);
+				} catch {
+					// Continue even if API calls fail
+				}
+			}
+
 			restartGame();
 			return;
 		}
@@ -1082,6 +1123,12 @@ io.on('connection', socket => {
 			revealedAnswerCount: 0,
 			zones: [],
 		} satisfies RoundState);
+
+		io.emit('gameEnded');
+
+		if (gameId) {
+			void callApi('POST', `/api/games/${gameId}/server-end`);
+		}
 
 		setTimeout(() => {
 			process.exit(0);

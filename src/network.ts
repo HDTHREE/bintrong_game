@@ -72,16 +72,17 @@ export type NetworkCallbacks = {
 	onRoundState: (state: RoundState) => void;
 	onHostGamePrompt: (payload: {initialStart: boolean}) => void;
 	onObstaclesState: (obstacles: ObstacleData[]) => void;
+	onGameEnded: () => void;
 };
 
 let socket: Socket | undefined;
 
-export function connect(callbacks: NetworkCallbacks) {
+export function connect(callbacks: NetworkCallbacks, gamePlayerId: string) {
 	// Connect to wherever the page was served from, resolving the socket.io
 	// path relative to the current page so nginx can route it to the correct
 	// game server container when accessed via a sub-path proxy.
 	const basePath = globalThis.location.pathname.replace(/\/$/, '');
-	socket = io({path: `${basePath}/socket.io/`});
+	socket = io({path: `${basePath}/socket.io/`, auth: {gamePlayerId}});
 
 	socket.on('init', (payload: InitPayload) => {
 		callbacks.onInit(payload);
@@ -117,6 +118,10 @@ export function connect(callbacks: NetworkCallbacks) {
 
 	socket.on('obstaclesState', (obstacles: ObstacleData[]) => {
 		callbacks.onObstaclesState(obstacles);
+	});
+
+	socket.on('gameEnded', () => {
+		callbacks.onGameEnded();
 	});
 }
 

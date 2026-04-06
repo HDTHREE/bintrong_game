@@ -1233,6 +1233,7 @@ function updateRemotePlayer(data: RemotePlayerData) {
 	}
 }
 
+const gamePlayerId = new URLSearchParams(window.location.search).get('gamePlayerId') ?? '';
 connect({
 	onInit(payload) {
 		socketId = payload.id;
@@ -1373,7 +1374,10 @@ connect({
 	onObstaclesState(obstacles) {
 		syncObstacles(obstacles);
 	},
-});
+	onGameEnded() {
+		window.parent?.postMessage({type: 'gameEnded'}, '*');
+	},
+}, gamePlayerId);
 
 const keys: Record<string, boolean> = {};
 globalThis.addEventListener('keydown', event => {

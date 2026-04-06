@@ -31,6 +31,7 @@ import docker.errors
 from livetrivia.nginx_config import remove_game_route, write_game_route
 
 DOCKER_NETWORK: str = os.getenv("DOCKER_NETWORK", "livetrivia_net")
+BEARCAT_API_URL: str = os.getenv("BEARCAT_API_URL", "http://livetrivia_api:8000")
 GAME_IMAGE: str = os.getenv("GAME_IMAGE", "livetrivia-game:latest")
 NGINX_CONTAINER_NAME: str = os.getenv("NGINX_CONTAINER_NAME", "livetrivia_nginx")
 COMPOSE_PROJECT_NAME: str = os.getenv("COMPOSE_PROJECT_NAME", "bintrong_game")
@@ -54,7 +55,7 @@ def _make_tar(data: bytes, filename: str = "questions.apkg") -> bytes:
     return buf.getvalue()
 
 
-def spawn_game_server(game_code: str, file_bytes: bytes) -> None:
+def spawn_game_server(game_code: str, file_bytes: bytes, game_id: str) -> None:
     """Start a game server container for *game_code*.
 
     *file_bytes* are the raw bytes of the Anki package to inject into the
@@ -83,6 +84,10 @@ def spawn_game_server(game_code: str, file_bytes: bytes) -> None:
             name=name,
             network=DOCKER_NETWORK,
             detach=True,
+            environment={
+                "BEARCAT_API_URL": BEARCAT_API_URL,
+                "BEARCAT_GAME_ID": game_id,
+            },
             labels={
                 "managed-by": "livetrivia-api",
                 "game-code": game_code,

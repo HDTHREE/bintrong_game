@@ -24,6 +24,8 @@ class Round(SQLModel, table=True):
     """Column: Start time of round."""
     ended_at: datetime | None = None
     """Column: End time of round."""
+    winner_id: uuid.UUID | None = Field(default=None, foreign_key="gameplayer.id")
+    """Column: The GamePlayer that won this round."""
 
     game: "Game" = Relationship()
     """Related entry: Game that this round was played in."""

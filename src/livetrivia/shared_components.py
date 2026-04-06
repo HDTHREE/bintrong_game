@@ -11,3 +11,5 @@ interval = dcc.Interval("interval", 3.6e5)
 
 
 url = dcc.Location(id="url")
+
+game_player_store = dcc.Store("game-player", "session")

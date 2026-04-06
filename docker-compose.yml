@@ -56,6 +56,7 @@ services:
       NGINX_CONTAINER_NAME: livetrivia_nginx
       NGINX_CONF_PATH: /nginx_conf
       COMPOSE_PROJECT_NAME: ${COMPOSE_PROJECT_NAME:-bintrong_game}
+      BEARCAT_API_URL: http://livetrivia_api:8000
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - nginx_config:/nginx_conf

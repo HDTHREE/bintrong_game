@@ -208,7 +208,7 @@ async def start_game(
     await sql.refresh(game)
 
     if game.game_code:
-        spawn_game_server(game.game_code, file_bytes)
+        spawn_game_server(game.game_code, file_bytes, str(game.id))
 
     return game
 
@@ -286,36 +286,12 @@ async def end_game(
 
 
 @router.post(
-    "/{game_id}/{player_id}/score",
-    response_model=GamePlayerResponse,
-    status_code=status.HTTP_200_OK,
+    "/{game_id}/server-end", response_model=GameResponse, status_code=status.HTTP_200_OK
 )
-async def increment_player_score(
+async def server_end_game(
     game_id: uuid.UUID,
-    player_id: uuid.UUID,
     sql: SqlSession,
-    credentials: BearerCredentials,
-) -> GamePlayer:
-    access_token = credentials.credentials
-    user_id = verify_token(access_token, token_type="access")
-    if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired access token",
-        )
-
-    stmt = select(Session).where(
-        (Session.access_token == access_token) & (Session.is_active)
-    )
-    result = await sql.execute(stmt)
-    session = result.scalars().first()
-
-    if not session:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Session not found or inactive",
-        )
-
+) -> Game:
     stmt = select(Game).where(Game.id == game_id)
     result = await sql.execute(stmt)
     game = result.scalars().first()
@@ -325,12 +301,39 @@ async def increment_player_score(
             status_code=status.HTTP_404_NOT_FOUND, detail="Game not found"
         )
 
-    if game.host_session_id != session.id:
+    if game.status != Status.RUNNING:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the game host can increment player scores",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Game must be in RUNNING status to end",
         )
 
+    game_code = game.game_code
+    game.status = Status.ENDED
+    game.ended_at = datetime.now()
+    game.game_code = None
+    sql.add(game)
+    await sql.commit()
+    await sql.refresh(game)
+
+    if game_code:
+        try:
+            stop_game_server(game_code)
+        except Exception:
+            pass
+
+    return game
+
+
+@router.post(
+    "/{game_id}/{player_id}/score",
+    response_model=GamePlayerResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def increment_player_score(
+    game_id: uuid.UUID,
+    player_id: uuid.UUID,
+    sql: SqlSession,
+) -> GamePlayer:
     stmt = select(GamePlayer).where(
         (GamePlayer.id == player_id) & (GamePlayer.game_id == game_id)
     )

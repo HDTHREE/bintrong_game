@@ -112,6 +112,7 @@ async def populate_questions_select(_: dict, token: dict):
     dash.Output(url, "pathname", allow_duplicate=True),
     dash.Output(join_alert, "children", allow_duplicate=True),
     dash.Output(join_alert, "style", allow_duplicate=True),
+    dash.Output("game-player", "data", allow_duplicate=True),
     dash.Input(join_button, "n_clicks"),
     dash.State(game_code_input, "value"),
     dash.State(token_store, "data"),
@@ -126,6 +127,7 @@ async def on_join(n_clicks: int | None, game_code: str | None, token: dict | Non
             dash.no_update,
             "You must have a session to join a game.",
             {"display": "block"},
+            dash.no_update,
         )
     game_code = game_code.upper()
     headers = {"Authorization": f"Bearer {token['access_token']}"}
@@ -134,16 +136,18 @@ async def on_join(n_clicks: int | None, game_code: str | None, token: dict | Non
             "api/games/join", params={"game_code": game_code}, headers=headers
         ) as resp:
             if resp.status == 201:
-                return f"/game/{game_code}", dash.no_update, dash.no_update
+                game_player = await resp.json()
+                return f"/game/{game_code}", dash.no_update, dash.no_update, {"id": game_player["id"]}
             data = await resp.json()
             detail = data.get("detail", "Failed to join game.")
-    return dash.no_update, detail, {"display": "block"}
+    return dash.no_update, detail, {"display": "block"}, dash.no_update
 
 
 @app.callback(
     dash.Output(url, "pathname", allow_duplicate=True),
     dash.Output(join_alert, "children", allow_duplicate=True),
     dash.Output(join_alert, "style", allow_duplicate=True),
+    dash.Output("game-player", "data", allow_duplicate=True),
     dash.Input(host_button, "n_clicks"),
     dash.State(questions_select, "value"),
     dash.State(token_store, "data"),
@@ -158,6 +162,7 @@ async def on_host(n_clicks: int | None, file_id: str | None, token: dict | None)
             dash.no_update,
             "You must have a session to host a game.",
             {"display": "block"},
+            dash.no_update,
         )
     headers = {"Authorization": f"Bearer {token['access_token']}"}
     async with aiohttp.ClientSession(BACKEND_URL) as session:
@@ -168,6 +173,7 @@ async def on_host(n_clicks: int | None, file_id: str | None, token: dict | None)
                     dash.no_update,
                     data.get("detail", "Failed to create game."),
                     {"display": "block"},
+                    dash.no_update,
                 )
             game = await resp.json()
         game_id = game["id"]
@@ -184,6 +190,7 @@ async def on_host(n_clicks: int | None, file_id: str | None, token: dict | None)
                     dash.no_update,
                     data.get("detail", "Failed to set game file."),
                     {"display": "block"},
+                    dash.no_update,
                 )
         async with session.post(f"api/games/{game_id}/start", headers=headers) as resp:
             if resp.status != 200:
@@ -195,8 +202,13 @@ async def on_host(n_clicks: int | None, file_id: str | None, token: dict | None)
                     dash.no_update,
                     data.get("detail", "Failed to start game."),
                     {"display": "block"},
+                    dash.no_update,
                 )
-    return f"/game/{game_code}", dash.no_update, dash.no_update
+        async with session.post(
+            "api/games/join", params={"game_code": game_code}, headers=headers
+        ) as resp:
+            game_player_data = {"id": (await resp.json()).get("id")} if resp.status in (200, 201) else dash.no_update
+    return f"/game/{game_code}", dash.no_update, dash.no_update, game_player_data
 
 
 dash.register_page(
