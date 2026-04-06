@@ -713,6 +713,12 @@ function restartGame() {
 	awaitingHostDecision = false;
 	roundState.round = 0;
 
+	triviaCards = shuffle(triviaCards);
+	triviaCursor = 0;
+
+	obstacles.clear();
+	broadcastObstaclesState();
+
 	for (const player of players.values()) {
 		player.dead = false;
 		player.x = (Math.random() * 2 - 1) * spawnRange;
