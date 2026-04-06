@@ -73,22 +73,22 @@ roundQuestion.textContent = 'Waiting for first question';
 roundHud.append(roundTimer, roundQuestion);
 document.body.append(roundHud);
 
-const scoreboardEl = document.createElement('div');
-scoreboardEl.style.position = 'fixed';
-scoreboardEl.style.top = '18px';
-scoreboardEl.style.right = '14px';
-scoreboardEl.style.padding = '8px 12px';
-scoreboardEl.style.background = 'rgba(0, 0, 0, 0.45)';
-scoreboardEl.style.border = '1px solid rgba(255, 255, 255, 0.2)';
-scoreboardEl.style.borderRadius = '10px';
-scoreboardEl.style.color = '#ffffff';
-scoreboardEl.style.fontFamily = '"Trebuchet MS", Verdana, sans-serif';
-scoreboardEl.style.fontSize = '0.88rem';
-scoreboardEl.style.backdropFilter = 'blur(2px)';
-scoreboardEl.style.pointerEvents = 'none';
-scoreboardEl.style.zIndex = '1000';
-scoreboardEl.style.minWidth = '140px';
-document.body.append(scoreboardEl);
+const scoreboardElement = document.createElement('div');
+scoreboardElement.style.position = 'fixed';
+scoreboardElement.style.top = '18px';
+scoreboardElement.style.right = '14px';
+scoreboardElement.style.padding = '8px 12px';
+scoreboardElement.style.background = 'rgba(0, 0, 0, 0.45)';
+scoreboardElement.style.border = '1px solid rgba(255, 255, 255, 0.2)';
+scoreboardElement.style.borderRadius = '10px';
+scoreboardElement.style.color = '#ffffff';
+scoreboardElement.style.fontFamily = '"Trebuchet MS", Verdana, sans-serif';
+scoreboardElement.style.fontSize = '0.88rem';
+scoreboardElement.style.backdropFilter = 'blur(2px)';
+scoreboardElement.style.pointerEvents = 'none';
+scoreboardElement.style.zIndex = '1000';
+scoreboardElement.style.minWidth = '140px';
+document.body.append(scoreboardElement);
 
 function renderScoreboard(rows: ScoreboardRow[]) {
 	const statusIcon: Record<ScoreboardRow['status'], string> = {
@@ -97,14 +97,12 @@ function renderScoreboard(rows: ScoreboardRow[]) {
 		left: '❓',
 	};
 
-	scoreboardEl.innerHTML = rows
-		.map(
-			row =>
-				`<div style="display:flex;justify-content:space-between;gap:12px;padding:2px 0">`
-				+ `<span>Player ${row.playerNumber}</span>`
-				+ `<span>${statusIcon[row.status]} ${row.score}</span>`
-				+ `</div>`,
-		)
+	scoreboardElement.innerHTML = rows
+		.map(row =>
+			'<div style="display:flex;justify-content:space-between;gap:12px;padding:2px 0">'
+			+ `<span>Player ${row.playerNumber}</span>`
+			+ `<span>${statusIcon[row.status]} ${row.score}</span>`
+			+ '</div>')
 		.join('');
 }
 

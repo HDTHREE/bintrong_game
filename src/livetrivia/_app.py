@@ -172,18 +172,17 @@ async def on_refresh(
         if not email or not token:
             async with session.post("api/sessions/guest") as session_response:
                 return await session_response.json(), dash.no_update
-        # Otherwise, refresh the session.
+        # Otherwise, refresh the session. If the refresh fails, clear the session.
         try:
             params = {"refresh_token": token["refresh_token"]}
             async with session.post(
                 "api/sessions/refresh", params=params
             ) as session_response:
+                if session_response.status >= 400:
+                    return None, None
                 return await session_response.json(), dash.no_update
-        finally:
-            # Fr, why is this not reasonable? The behavior is easily explained and consistent.
-            # pylint standard is so ass; there no way to just have: "code might fail and idc" tf.
-            # Reasonable if you could do broad-caught-exception but no.
-            return None, None  # pylint: disable=lost-exception, return-in-finally
+        except Exception:  # pylint: disable=broad-except
+            return None, None
 
 
 if __name__ == "__main__":

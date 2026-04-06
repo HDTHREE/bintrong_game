@@ -25,5 +25,19 @@ globalThis.dash_clientside = { // eslint-disable-line camelcase
 				globalThis.location.href = '/login';
 			}, 500);
 		},
+		updateLoginAlert(user, token) {
+			const hidden = {display: 'none'};
+			const visible = {display: 'block'};
+
+			if (user && token && token.access_token) {
+				return [`Logged in as ${user}.`, visible, 'blue'];
+			}
+
+			if (!user && !token) {
+				return ['Your session has expired. Please log in again.', visible, 'yellow'];
+			}
+
+			return [globalThis.dash_clientside.no_update, hidden, globalThis.dash_clientside.no_update];
+		},
 	},
 };

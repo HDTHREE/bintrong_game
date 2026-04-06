@@ -74,7 +74,9 @@ class K8sGameServerManager:
             core = k8s.CoreV1Api(api)
 
             cm = k8s.V1ConfigMap(
-                metadata=k8s.V1ObjectMeta(name=name, namespace=K8S_NAMESPACE, labels=labels),
+                metadata=k8s.V1ObjectMeta(
+                    name=name, namespace=K8S_NAMESPACE, labels=labels
+                ),
                 binary_data={"questions.apkg": base64.b64encode(file_bytes).decode()},
             )
             try:
@@ -100,7 +102,9 @@ class K8sGameServerManager:
                             image_pull_policy="IfNotPresent",
                             ports=[k8s.V1ContainerPort(container_port=3000)],
                             env=[
-                                k8s.V1EnvVar(name="BEARCAT_API_URL", value=BEARCAT_API_URL),
+                                k8s.V1EnvVar(
+                                    name="BEARCAT_API_URL", value=BEARCAT_API_URL
+                                ),
                                 k8s.V1EnvVar(name="BEARCAT_GAME_ID", value=game_id),
                             ],
                             volume_mounts=[
@@ -131,7 +135,9 @@ class K8sGameServerManager:
                     raise
 
             svc = k8s.V1Service(
-                metadata=k8s.V1ObjectMeta(name=name, namespace=K8S_NAMESPACE, labels=labels),
+                metadata=k8s.V1ObjectMeta(
+                    name=name, namespace=K8S_NAMESPACE, labels=labels
+                ),
                 spec=k8s.V1ServiceSpec(
                     selector=labels,
                     ports=[k8s.V1ServicePort(port=3000, target_port=3000)],
@@ -193,9 +199,7 @@ class K8sGameServerManager:
 
             for pod in pods.items:
                 try:
-                    await core.delete_namespaced_pod(
-                        pod.metadata.name, K8S_NAMESPACE
-                    )
+                    await core.delete_namespaced_pod(pod.metadata.name, K8S_NAMESPACE)
                 except k8s.ApiException:
                     pass
 
@@ -220,7 +224,6 @@ class K8sGameServerManager:
                     )
                 except k8s.ApiException:
                     pass
-
 
     async def _get_nginx_pod_name(self, core: k8s.CoreV1Api) -> str | None:
         pods = await core.list_namespaced_pod(
@@ -278,7 +281,13 @@ class K8sGameServerManager:
             f"}}\n"
         )
         path = f"/etc/nginx/conf.d/games/{game_code}.conf"
-        await self._nginx_exec(["sh", "-c", f"mkdir -p /etc/nginx/conf.d/games && cat > {path} << 'ENDCONF'\n{conf}ENDCONF"])
+        await self._nginx_exec(
+            [
+                "sh",
+                "-c",
+                f"mkdir -p /etc/nginx/conf.d/games && cat > {path} << 'ENDCONF'\n{conf}ENDCONF",
+            ]
+        )
         await self._nginx_exec(["nginx", "-s", "reload"])
 
     async def _remove_nginx_route(self, game_code: str) -> None:

@@ -21,6 +21,12 @@ layout: dmc.AppShellMain = dmc.AppShellMain(
             w="60vw",
             children=dmc.Fieldset(
                 children=[
+                    login_alert := dmc.Alert(
+                        id="login-alert",
+                        style={"display": "none"},
+                        children="",
+                    ),
+                    dmc.Space(h=10),
                     email_input := dmc.TextInput(
                         placeholder="user@example.com",
                         label="Email",
@@ -162,6 +168,17 @@ update_state_create: ClientsideFunctionType = app.clientside_callback(
     prevent_initial_call=True,
 )
 """Callback to update the disabled/enabled state of the create account button."""
+
+
+update_login_alert: ClientsideFunctionType = app.clientside_callback(
+    dash.ClientsideFunction("login", "updateLoginAlert"),
+    dash.Output(login_alert, "children"),
+    dash.Output(login_alert, "style"),
+    dash.Output(login_alert, "color"),
+    dash.Input(user_store, "data"),
+    dash.Input(token_store, "data"),
+)
+"""Callback to display a status alert based on the user's session state."""
 
 
 dash.register_page(
