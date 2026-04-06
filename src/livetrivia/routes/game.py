@@ -267,20 +267,26 @@ async def end_game(
             detail="Game must be in RUNNING status to end",
         )
 
+    game_code = game.game_code
     game.status = Status.ENDED
     game.ended_at = datetime.now()
+    game.game_code = None
     sql.add(game)
     await sql.commit()
     await sql.refresh(game)
 
-    if game.game_code:
-        stop_game_server(game.game_code)
+    if game_code:
+        try:
+            stop_game_server(game_code)
+        except Exception:
+            if not body.force:
+                raise
 
     return game
 
 
 @router.post(
-    "/{game_id}/{player_id}/win",
+    "/{game_id}/{player_id}/score",
     response_model=GamePlayerResponse,
     status_code=status.HTTP_200_OK,
 )
