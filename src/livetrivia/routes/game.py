@@ -4,8 +4,7 @@ from pydantic import BaseModel
 from datetime import datetime
 import uuid
 
-from livetrivia.db import SqlSession, Storage, BUCKET_NAME
-from livetrivia.docker_manager import spawn_game_server, stop_game_server
+from livetrivia.db import SqlSession, Storage, BUCKET_NAME, GameServerDep
 from livetrivia.models.files import File
 from livetrivia.models.game import Game, GamePlayer
 from livetrivia.models.session import Session
@@ -144,6 +143,7 @@ async def start_game(
     sql: SqlSession,
     storage: Storage,
     credentials: BearerCredentials,
+    manager: GameServerDep,
 ) -> Game:
     access_token = credentials.credentials
     user_id = verify_token(access_token, token_type="access")
@@ -208,7 +208,7 @@ async def start_game(
     await sql.refresh(game)
 
     if game.game_code:
-        spawn_game_server(game.game_code, file_bytes, str(game.id))
+        await manager.spawn_game_server(game.game_code, file_bytes, str(game.id))
 
     return game
 
@@ -224,6 +224,7 @@ async def end_game(
     game_id: uuid.UUID,
     sql: SqlSession,
     credentials: BearerCredentials,
+    manager: GameServerDep,
     body: EndGameRequest = EndGameRequest(),
 ) -> Game:
     access_token = credentials.credentials
@@ -277,7 +278,7 @@ async def end_game(
 
     if game_code:
         try:
-            stop_game_server(game_code)
+            await manager.stop_game_server(game_code)
         except Exception:
             if not body.force:
                 raise
@@ -291,6 +292,7 @@ async def end_game(
 async def server_end_game(
     game_id: uuid.UUID,
     sql: SqlSession,
+    manager: GameServerDep,
 ) -> Game:
     stmt = select(Game).where(Game.id == game_id)
     result = await sql.execute(stmt)
@@ -317,7 +319,7 @@ async def server_end_game(
 
     if game_code:
         try:
-            stop_game_server(game_code)
+            await manager.stop_game_server(game_code)
         except Exception:
             pass
 

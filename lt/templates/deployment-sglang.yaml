@@ -1,0 +1,53 @@
+{{- if .Values.sglang.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "lt.fullname" . }}-sglang
+  labels:
+    {{- include "lt.labels" . | nindent 4 }}
+    app.kubernetes.io/component: sglang
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "lt.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: sglang
+  template:
+    metadata:
+      labels:
+        {{- include "lt.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: sglang
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: sglang
+          image: "{{ .Values.sglang.image.repository }}:{{ .Values.sglang.image.tag }}"
+          imagePullPolicy: {{ .Values.sglang.image.pullPolicy }}
+          {{- with .Values.sglang.args }}
+          command:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: 30000
+              protocol: TCP
+          volumeMounts:
+            - name: model
+              mountPath: /models/mistral-7b
+              readOnly: true
+          {{- with .Values.sglang.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: model
+          {{- if .Values.sglang.model.existingClaim }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.sglang.model.existingClaim }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+{{- end }}

@@ -1,4 +1,5 @@
 import contextlib as cl
+import os
 import aioboto3
 from sqlmodel import SQLModel
 import typing_extensions as tp
@@ -6,6 +7,10 @@ import sqlalchemy.ext.asyncio as sqlas
 import sqlalchemy.orm as sqlorm
 from livetrivia.utils import getenvs
 from livetrivia.storage import StorageClient
+from livetrivia.game_server_manager import (
+    GameServerManager,
+    DockerGameServerManager,
+)
 from fastapi import Depends
 import logging
 
@@ -22,6 +27,7 @@ SQL_URL, S3_URL, S3_REGION, BUCKET_NAME = getenvs(logger=logger)
 """Enivronment variables for database and S3 configuration."""
 
 _USE_POSTGRES: bool = "postgresql" in SQL_URL
+DEPLOYMENT_MODE: str = os.getenv("DEPLOYMENT_MODE", "docker")
 
 if not _USE_POSTGRES and S3_URL is None:
     raise RuntimeError(
@@ -127,9 +133,8 @@ async def lifespan(_: "FastAPI") -> tp.AsyncGenerator[None, None]:
             await connection.run_sync(SQLModel.metadata.create_all)
     yield
 
-    from livetrivia.docker_manager import stop_all_game_servers
-
-    stop_all_game_servers()
+    manager = _get_game_server_manager()
+    await manager.stop_all_game_servers()
 
 
 SqlSession: tp.TypeAlias = tp.Annotated[sqlas.AsyncSession, Depends(get_sql_session)]
@@ -141,3 +146,22 @@ S3Client: tp.TypeAlias = tp.Annotated["aiob3t.S3Client", Depends(get_s3_client)]
 
 Storage: tp.TypeAlias = tp.Annotated[StorageClient, Depends(get_storage)]
 """Unified storage dependency. Uses PostgreSQL in production, S3/LocalStack in development."""
+
+
+def _get_game_server_manager() -> GameServerManager:
+    if DEPLOYMENT_MODE == "kubernetes":
+        from livetrivia.k8s_manager import K8sGameServerManager
+
+        return K8sGameServerManager()
+    return DockerGameServerManager()
+
+
+async def get_game_server_manager() -> tp.AsyncGenerator[GameServerManager]:
+    """Dependency that yields the active :class:`GameServerManager` backend."""
+    yield _get_game_server_manager()
+
+
+GameServerDep: tp.TypeAlias = tp.Annotated[
+    GameServerManager, Depends(get_game_server_manager)
+]
+"""Game server manager dependency. Uses Docker or Kubernetes based on DEPLOYMENT_MODE."""

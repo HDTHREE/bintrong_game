@@ -32,6 +32,7 @@ backend = [
     "genanki>=0.13.1",
     "docker>=7.0.0",
     "nginx-config-builder>=1.0.1",
+    "kubernetes_asyncio>=31.1.0",
 ]
 frontend = [
     "dash-ag-grid>=32.3.2",

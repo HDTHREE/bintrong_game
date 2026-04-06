@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "lt.fullname" . }}-nginx
+  labels:
+    {{- include "lt.labels" . | nindent 4 }}
+data:
+  nginx.conf: |
+    worker_processes auto;
+    error_log /var/log/nginx/error.log warn;
+    pid /var/run/nginx.pid;
+
+    events {
+        worker_connections 1024;
+    }
+
+    http {
+        include       /etc/nginx/mime.types;
+        default_type  application/octet-stream;
+
+        sendfile        on;
+        keepalive_timeout 65;
+
+        include /etc/nginx/conf.d/*.conf;
+    }
+
+  default.conf: |
+    server {
+        listen 80;
+        server_name _;
+
+        # CoreDNS resolver IP for runtime DNS resolution in proxy_pass variables.
+        # 'valid=5s' keeps resolved addresses fresh so removed Services are
+        # noticed quickly.  Must be an IP, not a hostname.
+        resolver {{ .Values.dnsResolverIP }} valid=5s;
+
+        # Dynamically generated game server location blocks
+        include /etc/nginx/conf.d/games/*.conf;
+
+        location / {
+            proxy_pass http://{{ include "lt.fullname" . }}-app:7777/;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $http_connection;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_cache_bypass $http_upgrade;
+        }
+    }
