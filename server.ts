@@ -1025,10 +1025,6 @@ function endGame() {
 	if (gameId) {
 		void callApi('POST', `/api/games/${gameId}/server-end`);
 	}
-
-	setTimeout(() => {
-		process.exit(0);
-	}, 200);
 }
 
 io.on('connection', socket => {
@@ -1179,14 +1175,6 @@ io.on('connection', socket => {
 		} satisfies RoundState);
 
 		io.emit('gameEnded');
-
-		if (gameId) {
-			void callApi('POST', `/api/games/${gameId}/server-end`);
-		}
-
-		setTimeout(() => {
-			process.exit(0);
-		}, 200);
 	});
 
 	socket.on('disconnect', () => {
