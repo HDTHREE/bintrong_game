@@ -49,7 +49,9 @@ layout: dmc.AppShellMain = dmc.AppShellMain(
                             align="flex-end",
                             children=[
                                 questions_select := dmc.Select(
-                                    maw="100%", label="Host", placeholder="questions.apkg"
+                                    maw="100%",
+                                    label="Host",
+                                    placeholder="questions.apkg",
                                 ),
                                 host_button := dmc.Button(children="Host", maw="20%"),
                             ],
@@ -137,7 +139,12 @@ async def on_join(n_clicks: int | None, game_code: str | None, token: dict | Non
         ) as resp:
             if resp.status == 201:
                 game_player = await resp.json()
-                return f"/game/{game_code}", dash.no_update, dash.no_update, {"id": game_player["id"]}
+                return (
+                    f"/game/{game_code}",
+                    dash.no_update,
+                    dash.no_update,
+                    {"id": game_player["id"]},
+                )
             data = await resp.json()
             detail = data.get("detail", "Failed to join game.")
     return dash.no_update, detail, {"display": "block"}, dash.no_update
@@ -207,7 +214,11 @@ async def on_host(n_clicks: int | None, file_id: str | None, token: dict | None)
         async with session.post(
             "api/games/join", params={"game_code": game_code}, headers=headers
         ) as resp:
-            game_player_data = {"id": (await resp.json()).get("id")} if resp.status in (200, 201) else dash.no_update
+            game_player_data = (
+                {"id": (await resp.json()).get("id")}
+                if resp.status in (200, 201)
+                else dash.no_update
+            )
     return f"/game/{game_code}", dash.no_update, dash.no_update, game_player_data
 
 

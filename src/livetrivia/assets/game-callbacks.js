@@ -2,7 +2,7 @@ let _gamePollInterval = null;
 
 window.addEventListener('message', event => {
 	if (event.data?.type === 'gameEnded') {
-		window._livetrivia_gameEnded = true;
+		globalThis._livetrivia_gameEnded = true;
 	}
 });
 
@@ -47,12 +47,12 @@ globalThis.dash_clientside = {
 			return src;
 		},
 		pollGameEnded(_n) {
-			if (window._livetrivia_gameEnded) {
-				window._livetrivia_gameEnded = false;
+			if (globalThis._livetrivia_gameEnded) {
+				globalThis._livetrivia_gameEnded = false;
 				return '/join';
 			}
 
-			return window.dash_clientside.no_update;
+			return globalThis.dash_clientside.no_update;
 		},
 	},
 };

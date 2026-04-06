@@ -128,6 +128,7 @@ async def lifespan(_: "FastAPI") -> tp.AsyncGenerator[None, None]:
     yield
 
     from livetrivia.docker_manager import stop_all_game_servers
+
     stop_all_game_servers()
 
 

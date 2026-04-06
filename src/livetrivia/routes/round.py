@@ -217,7 +217,8 @@ async def end_round(
 
     if body.winner_id is not None:
         stmt = select(GamePlayer).where(
-            (GamePlayer.id == body.winner_id) & (GamePlayer.game_id == round_obj.game_id)
+            (GamePlayer.id == body.winner_id)
+            & (GamePlayer.game_id == round_obj.game_id)
         )
         result = await sql.execute(stmt)
         if not result.scalars().first():
@@ -237,7 +238,9 @@ async def end_round(
 
 
 @router.post(
-    "/{game_id}/server-create", response_model=RoundResponse, status_code=status.HTTP_201_CREATED
+    "/{game_id}/server-create",
+    response_model=RoundResponse,
+    status_code=status.HTTP_201_CREATED,
 )
 async def server_create_round(
     game_id: uuid.UUID,
@@ -267,7 +270,9 @@ async def server_create_round(
 
 
 @router.post(
-    "/{round_id}/server-start", response_model=RoundResponse, status_code=status.HTTP_200_OK
+    "/{round_id}/server-start",
+    response_model=RoundResponse,
+    status_code=status.HTTP_200_OK,
 )
 async def server_start_round(
     round_id: uuid.UUID,
@@ -298,7 +303,9 @@ async def server_start_round(
 
 
 @router.post(
-    "/{round_id}/server-end", response_model=RoundResponse, status_code=status.HTTP_200_OK
+    "/{round_id}/server-end",
+    response_model=RoundResponse,
+    status_code=status.HTTP_200_OK,
 )
 async def server_end_round(
     round_id: uuid.UUID,
@@ -331,7 +338,8 @@ async def server_end_round(
 
     if body.winner_id is not None:
         stmt = select(GamePlayer).where(
-            (GamePlayer.id == body.winner_id) & (GamePlayer.game_id == round_obj.game_id)
+            (GamePlayer.id == body.winner_id)
+            & (GamePlayer.game_id == round_obj.game_id)
         )
         result = await sql.execute(stmt)
         if not result.scalars().first():

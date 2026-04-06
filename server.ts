@@ -140,7 +140,7 @@ const obstacles = new Map<string, ObstacleState>();
 
 const apiUrl = process.env.BEARCAT_API_URL ?? '';
 const gameId = process.env.BEARCAT_GAME_ID ?? '';
-let currentRoundId: string | null = null;
+let currentRoundId: string | undefined = null;
 
 let roundState: RoundState = {
 	phase: 'waiting',

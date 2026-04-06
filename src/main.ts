@@ -1233,7 +1233,7 @@ function updateRemotePlayer(data: RemotePlayerData) {
 	}
 }
 
-const gamePlayerId = new URLSearchParams(window.location.search).get('gamePlayerId') ?? '';
+const gamePlayerId = new URLSearchParams(globalThis.location.search).get('gamePlayerId') ?? '';
 connect({
 	onInit(payload) {
 		socketId = payload.id;
