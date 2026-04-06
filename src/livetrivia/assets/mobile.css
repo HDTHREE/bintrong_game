@@ -1,0 +1,21 @@
+/* Mobile-responsive navbar: 2x2 grid on small screens */
+@media (max-width: 768px) {
+    .mantine-AppShell-header {
+        height: auto !important;
+    }
+
+    .nav-flex {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr;
+        gap: 2px;
+        height: auto !important;
+    }
+
+    .nav-flex .mantine-NavLink-root {
+        width: 100% !important;
+    }
+
+    .nav-flex .mantine-NavLink-root .mantine-Text-root {
+        width: auto !important;
+    }
+}

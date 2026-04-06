@@ -11,17 +11,19 @@ app: dash.Dash = dash.get_app()
 layout: dmc.AppShellMain = dmc.AppShellMain(
     px=0,
     pb=0,
-    style={"overflow": "hidden"},
+    style={"overflow": "hidden", "height": "100vh", "boxSizing": "border-box"},
     children=[
         dash.html.Iframe(
             id="game-embed",
             src="",
             style={
                 "width": "100%",
-                "height": "calc(100vh - 8vh)",
+                "height": "100%",
                 "border": "none",
                 "display": "block",
                 "visibility": "hidden",
+                "margin": "0",
+                "padding": "0",
             },
         ),
         dash.dcc.Interval(id="game-end-poll", interval=500),

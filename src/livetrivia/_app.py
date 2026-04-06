@@ -54,6 +54,7 @@ app.layout = dmc.MantineProvider(
                     p=3,
                     w="100%",
                     h="100%",
+                    className="nav-flex",
                     children=[
                         home_link := dmc.NavLink(
                             label=dmc.Text(dash.page_registry["home"]["name"], w=170),

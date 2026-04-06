@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js';
+import nipplejs from 'nipplejs';
 import {
 	connect,
 	sendUpdate,
@@ -23,6 +24,57 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.append(renderer.domElement);
+
+const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+const portraitOverlay = document.createElement('div');
+portraitOverlay.style.position = 'fixed';
+portraitOverlay.style.inset = '0';
+portraitOverlay.style.display = 'none';
+portraitOverlay.style.flexDirection = 'column';
+portraitOverlay.style.alignItems = 'center';
+portraitOverlay.style.justifyContent = 'center';
+portraitOverlay.style.gap = '24px';
+portraitOverlay.style.background = 'rgba(0, 0, 0, 0.92)';
+portraitOverlay.style.color = '#ffffff';
+portraitOverlay.style.fontFamily = '"Trebuchet MS", Verdana, sans-serif';
+portraitOverlay.style.zIndex = '99999';
+portraitOverlay.style.pointerEvents = 'auto';
+
+const rotateIcon = document.createElement('div');
+rotateIcon.textContent = '📱';
+rotateIcon.style.fontSize = '4rem';
+rotateIcon.style.transform = 'rotate(90deg)';
+rotateIcon.style.transition = 'transform 0.6s ease';
+
+const rotateText = document.createElement('div');
+rotateText.textContent = 'Rotate your device to landscape';
+rotateText.style.fontSize = 'clamp(1.2rem, 4vw, 2rem)';
+rotateText.style.fontWeight = '700';
+rotateText.style.letterSpacing = '0.04em';
+rotateText.style.textAlign = 'center';
+rotateText.style.padding = '0 20px';
+
+portraitOverlay.append(rotateIcon, rotateText);
+document.body.append(portraitOverlay);
+
+let isPortraitBlocked = false;
+
+function checkOrientation() {
+	if (!isMobile) {
+		return;
+	}
+
+	const portrait = window.innerHeight > window.innerWidth;
+	isPortraitBlocked = portrait;
+	portraitOverlay.style.display = portrait ? 'flex' : 'none';
+}
+
+if (isMobile) {
+	checkOrientation();
+	window.addEventListener('resize', checkOrientation);
+	screen.orientation?.addEventListener('change', checkOrientation);
+}
 
 const deadOverlay = document.createElement('div');
 deadOverlay.textContent = 'YOU ARE DEAD';
@@ -183,6 +235,138 @@ hostDecisionButtons.append(hostDecisionStartButton, hostDecisionBackButton);
 hostDecisionPanel.append(hostDecisionTitle, hostDecisionText, hostDecisionButtons);
 hostDecisionDialog.append(hostDecisionPanel);
 document.body.append(hostDecisionDialog);
+
+const mobileDir = {x: 0, z: 0};
+
+if (isMobile) {
+	const buttonBaseStyle = (size: string): Partial<CSSStyleDeclaration> => ({
+		width: size,
+		height: size,
+		borderRadius: '50%',
+		border: '2px solid rgba(255, 255, 255, 0.35)',
+		background: 'rgba(255, 255, 255, 0.12)',
+		backdropFilter: 'blur(2px)',
+		color: 'rgba(255, 255, 255, 0.8)',
+		fontFamily: '"Trebuchet MS", Verdana, sans-serif',
+		fontWeight: '700',
+		fontSize: '0.85rem',
+		letterSpacing: '0.04em',
+		display: 'flex',
+		alignItems: 'center',
+		justifyContent: 'center',
+		cursor: 'pointer',
+		userSelect: 'none',
+		touchAction: 'none',
+		boxShadow: '0 0 12px rgba(0, 0, 0, 0.35)',
+	});
+
+	// Joystick container (left side)
+	const joystickZone = document.createElement('div');
+	joystickZone.style.position = 'fixed';
+	joystickZone.style.left = '10px';
+	joystickZone.style.bottom = '10px';
+	joystickZone.style.width = '150px';
+	joystickZone.style.height = '150px';
+	joystickZone.style.zIndex = '10001';
+	joystickZone.style.pointerEvents = 'auto';
+	document.body.append(joystickZone);
+
+	const joystick = nipplejs.create({
+		zone: joystickZone,
+		mode: 'static',
+		position: {left: '75px', bottom: '75px'},
+		color: 'rgba(255, 255, 255, 0.35)',
+		size: 120,
+		restOpacity: 0.6,
+	});
+
+	joystick.on('move', (event_: {data: {vector?: {x: number; y: number}; force: number}}) => {
+		const {data} = event_;
+		if (!data.vector) {
+			return;
+		}
+
+		// nipplejs: vector.x = right, vector.y = up
+		// Three.js: +x = right, -z = forward
+		const force = Math.min(data.force, 1);
+		mobileDir.x = data.vector.x * force;
+		mobileDir.z = -data.vector.y * force;
+	});
+
+	joystick.on('end', () => {
+		mobileDir.x = 0;
+		mobileDir.z = 0;
+	});
+
+	// Action buttons container (right side)
+	const actionButtonsContainer = document.createElement('div');
+	actionButtonsContainer.style.position = 'fixed';
+	actionButtonsContainer.style.right = '18px';
+	actionButtonsContainer.style.bottom = '18px';
+	actionButtonsContainer.style.display = 'flex';
+	actionButtonsContainer.style.flexDirection = 'column';
+	actionButtonsContainer.style.gap = '14px';
+	actionButtonsContainer.style.zIndex = '10001';
+	actionButtonsContainer.style.pointerEvents = 'auto';
+
+	// Jump button
+	const jumpButton = document.createElement('button');
+	jumpButton.type = 'button';
+	jumpButton.textContent = 'Jump';
+	Object.assign(jumpButton.style, buttonBaseStyle('72px'));
+	jumpButton.addEventListener('touchstart', event_ => {
+		event_.preventDefault();
+		keys.Space = true;
+	}, {passive: false});
+	jumpButton.addEventListener('touchend', event_ => {
+		event_.preventDefault();
+		keys.Space = false;
+	}, {passive: false});
+
+	// Punch button
+	const punchButton = document.createElement('button');
+	punchButton.type = 'button';
+	punchButton.textContent = 'Punch';
+	Object.assign(punchButton.style, buttonBaseStyle('72px'));
+	punchButton.addEventListener('touchstart', event_ => {
+		event_.preventDefault();
+		keys.Enter = true;
+	}, {passive: false});
+	punchButton.addEventListener('touchend', event_ => {
+		event_.preventDefault();
+		keys.Enter = false;
+	}, {passive: false});
+
+	actionButtonsContainer.append(jumpButton, punchButton);
+	document.body.append(actionButtonsContainer);
+
+	// Invisible input to keep the game focused on mobile browsers.
+	// Without this, touch events may not register reliably and the player becomes unpushable.
+	const focusInput = document.createElement('input');
+	focusInput.type = 'text';
+	focusInput.setAttribute('autocomplete', 'off');
+	focusInput.setAttribute('autocapitalize', 'off');
+	focusInput.setAttribute('autocorrect', 'off');
+	focusInput.setAttribute('spellcheck', 'false');
+	focusInput.inputMode = 'none';
+	focusInput.style.position = 'fixed';
+	focusInput.style.left = '-9999px';
+	focusInput.style.top = '-9999px';
+	focusInput.style.width = '1px';
+	focusInput.style.height = '1px';
+	focusInput.style.opacity = '0';
+	focusInput.style.pointerEvents = 'none';
+	document.body.append(focusInput);
+
+	// Focus on any touch to ensure the game stays active
+	document.addEventListener('touchstart', () => {
+		if (document.activeElement !== focusInput) {
+			focusInput.focus({preventScroll: true});
+		}
+	}, {passive: true});
+
+	focusInput.focus({preventScroll: true});
+}
 
 const dirLight = new THREE.DirectionalLight(0xFF_FF_FF, 1.2);
 dirLight.position.set(8, 15, 10);
@@ -1433,10 +1617,35 @@ globalThis.addEventListener('keyup', event => {
 });
 
 window.addEventListener('resize', () => {
-	camera.aspect = window.innerWidth / window.innerHeight;
-	camera.updateProjectionMatrix();
-	renderer.setSize(window.innerWidth, window.innerHeight);
+	if (isMobile) {
+		// Use visualViewport for the true visible area (excludes browser chrome/URL bar)
+		const vp = window.visualViewport;
+		const h = vp ? vp.height : window.innerHeight;
+		const desiredAspect = 16 / 9;
+		const w = Math.max(window.innerWidth, Math.round(h * desiredAspect));
+		camera.aspect = w / h;
+		camera.updateProjectionMatrix();
+		renderer.setSize(w, h);
+		// Center the canvas if it overflows
+		renderer.domElement.style.position = 'absolute';
+		renderer.domElement.style.left = `${(window.innerWidth - w) / 2}px`;
+		renderer.domElement.style.top = '0';
+	} else {
+		camera.aspect = window.innerWidth / window.innerHeight;
+		camera.updateProjectionMatrix();
+		renderer.setSize(window.innerWidth, window.innerHeight);
+	}
 });
+
+// Also listen to visualViewport resize on mobile (fires when browser chrome shows/hides)
+if (isMobile && window.visualViewport) {
+	window.visualViewport.addEventListener('resize', () => {
+		window.dispatchEvent(new Event('resize'));
+	});
+}
+
+// Fire initial resize to set correct mobile dimensions
+window.dispatchEvent(new Event('resize'));
 
 const clock = new THREE.Clock();
 let wasMoving = false;
@@ -1456,7 +1665,7 @@ function animate() {
 		}
 	}
 
-	const controlsLocked = currentRoundPhase === 'hostPrompt';
+	const controlsLocked = currentRoundPhase === 'hostPrompt' || isPortraitBlocked;
 	if (controlsLocked) {
 		velocity.y = 0;
 		onGround = true;
@@ -1479,6 +1688,11 @@ function animate() {
 
 	if (!isLocalDead && !isStunned && !controlsLocked && keys.KeyD) {
 		dir.x += 1;
+	}
+
+	if (!isLocalDead && !isStunned && !controlsLocked && (mobileDir.x !== 0 || mobileDir.z !== 0)) {
+		dir.x += mobileDir.x;
+		dir.z += mobileDir.z;
 	}
 
 	const isMoving = dir.length() > 0;

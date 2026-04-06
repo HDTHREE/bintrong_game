@@ -1,5 +1,27 @@
 let _gamePollInterval = null;
 
+const _isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+function _hideNavbarForGame() {
+	if (!_isMobile) return;
+	const header = document.querySelector('.mantine-AppShell-header');
+	const main = document.querySelector('.mantine-AppShell-main');
+	const iframe = document.querySelector('#game-embed');
+	if (header) header.style.display = 'none';
+	if (main) main.style.paddingTop = '0';
+	if (iframe) iframe.style.height = '100dvh';
+}
+
+function _restoreNavbarForGame() {
+	if (!_isMobile) return;
+	const header = document.querySelector('.mantine-AppShell-header');
+	const main = document.querySelector('.mantine-AppShell-main');
+	const iframe = document.querySelector('#game-embed');
+	if (header) header.style.display = '';
+	if (main) main.style.paddingTop = '';
+	if (iframe) iframe.style.height = '';
+}
+
 window.addEventListener('message', event => {
 	if (event.data?.type === 'gameEnded') {
 		globalThis._livetrivia_gameEnded = true;
@@ -18,6 +40,8 @@ globalThis.dash_clientside = {
 				clearInterval(_gamePollInterval);
 				_gamePollInterval = null;
 			}
+
+			_hideNavbarForGame();
 
 			const parts = pathname.split('/').filter(Boolean);
 			const gamePlayerId = gamePlayerData?.id ?? '';
@@ -49,6 +73,7 @@ globalThis.dash_clientside = {
 		pollGameEnded(_n) {
 			if (globalThis._livetrivia_gameEnded) {
 				globalThis._livetrivia_gameEnded = false;
+				_restoreNavbarForGame();
 				return '/join';
 			}
 
