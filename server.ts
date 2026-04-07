@@ -32,6 +32,7 @@ type PlayerState = {
 type TriviaCard = {
 	question: string;
 	answer: string;
+	modelId: string;
 };
 
 type AnswerZone = {
@@ -70,12 +71,47 @@ type ObstacleState = {
 	velocityZ: number;
 };
 
+type AnkiModelField = {
+	name: string;
+	ord: number;
+};
+
+type AnkiModelTemplate = {
+	name: string;
+	ord: number;
+	qfmt: string;
+	afmt: string;
+};
+
+type AnkiModel = {
+	getId: () => string;
+	getName: () => string;
+	getType: () => number;
+	getFields: () => AnkiModelField[];
+	getTemplates: () => AnkiModelTemplate[];
+};
+
+type AnkiFormattedString = {
+	formattedString: string;
+};
+
+type AnkiQuestion = {
+	getQuestion: () => AnkiFormattedString;
+	getAnswer: () => AnkiFormattedString;
+};
+
+type AnkiCard = {
+	getFront: () => string;
+	getBack: () => string;
+	getModel: () => AnkiModel;
+	getModelId: () => string;
+	getFields: () => Record<string, string>;
+	getQuestions: () => AnkiQuestion[];
+};
+
 type AnkiCollectionLike = {
 	getDecks: () => Record<string, {
-		getCards: () => Record<string, {
-			getFront: () => string;
-			getBack: () => string;
-		}>;
+		getCards: () => Record<string, AnkiCard>;
 	}>;
 };
 
@@ -137,6 +173,7 @@ const obstacleHeights: Record<ObstacleKind, number> = {
 };
 
 let triviaCards: TriviaCard[] = [];
+let answerPoolByModel = new Map<string, string[]>();
 let triviaCursor = 0;
 let currentCorrectAnswer = '';
 let phaseEndsAt = 0;
@@ -163,6 +200,10 @@ let roundState: RoundState = {
 
 function pickModel(): string {
 	return modelFiles[Math.floor(Math.random() * modelFiles.length)];
+}
+
+function hasImage(text: string): boolean {
+	return /<img\b/i.test(text);
 }
 
 function sanitizeCardText(text: string): string {
@@ -209,28 +250,104 @@ async function loadTriviaCardsFromApkg(): Promise<TriviaCard[]> {
 	const apkgPath = path.join(process.cwd(), 'questions.apkg');
 	const packageBytes = await readFile(apkgPath);
 
-	type ReadAnkiPackage = (ankiPackage: Blob) => Promise<{
-		collection: AnkiCollectionLike;
-		media: Record<string, Blob>;
-	}>;
+	type ReadAnkiCollection = (ankiCollection: Uint8Array) => Promise<AnkiCollectionLike>;
 
 	// eslint-disable-next-line no-eval -- anki-reader is ESM-only; this keeps dynamic import working from CJS output.
-	const importModule = (0, eval)('(specifier) => import(specifier)') as (specifier: string) => Promise<{
-		readAnkiPackage: ReadAnkiPackage;
-	}>;
-	const {readAnkiPackage} = await importModule('anki-reader');
-	const extractedPackage = await readAnkiPackage(new Blob([packageBytes]));
+	const importModule = (0, eval)('(specifier) => import(specifier)') as (specifier: string) => Promise<Record<string, unknown>>;
+	const {readAnkiCollection} = await importModule('anki-reader') as {readAnkiCollection: ReadAnkiCollection};
+	const zip = await importModule('@zip.js/zip.js') as {
+		ZipReader: new (reader: unknown) => {getEntries: () => Promise<Array<{filename: string; getData: (writer: unknown) => Promise<ArrayBuffer>}>>;};
+		BlobReader: new (blob: Blob) => unknown;
+		Uint8ArrayWriter: new () => unknown;
+	};
+
+	// Extract collection from zip, preferring collection.anki21 (newer format) over collection.anki2
+	const reader = new zip.ZipReader(new zip.BlobReader(new Blob([packageBytes])));
+	const entries = await reader.getEntries();
+	const collectionEntry
+		= entries.find(e => e.filename === 'collection.anki21')
+		?? entries.find(e => e.filename === 'collection.anki2');
+	if (!collectionEntry) {
+		throw new Error('questions.apkg contains no collection database');
+	}
+
+	const collectionBytes = await collectionEntry.getData(new zip.Uint8ArrayWriter());
+	const collection = await readAnkiCollection(new Uint8Array(collectionBytes));
 
 	const loadedCards: TriviaCard[] = [];
-	for (const deck of Object.values(extractedPackage.collection.getDecks())) {
+	for (const deck of Object.values(collection.getDecks())) {
 		for (const card of Object.values(deck.getCards())) {
-			const question = sanitizeCardText(card.getFront());
-			const answer = sanitizeCardText(card.getBack());
-			if (!question || !answer) {
-				continue;
-			}
+			const model = card.getModel();
+			const modelType = model.getType(); // 0 = standard, 1 = cloze
+			const modelId = model.getId();
+			const templates = model.getTemplates();
 
-			loadedCards.push({question, answer});
+			if (modelType === 1) {
+				// Cloze cards: use rendered questions which resolve each cloze deletion
+				for (const q of card.getQuestions()) {
+					const rawQuestion = q.getQuestion().formattedString;
+					const rawAnswer = q.getAnswer().formattedString;
+					if (hasImage(rawQuestion) && hasImage(rawAnswer)) {
+						continue;
+					}
+
+					if (hasImage(rawQuestion) || hasImage(rawAnswer)) {
+						// Skip only the part with an image; if both have images, skip entirely
+						const question = hasImage(rawQuestion) ? '' : sanitizeCardText(rawQuestion);
+						const answer = hasImage(rawAnswer) ? '' : sanitizeCardText(rawAnswer);
+						if (question && answer) {
+							loadedCards.push({question, answer, modelId});
+						}
+
+						continue;
+					}
+
+					const question = sanitizeCardText(rawQuestion);
+					const answer = sanitizeCardText(rawAnswer);
+					if (question && answer) {
+						loadedCards.push({question, answer, modelId});
+					}
+				}
+			} else if (templates.length >= 2) {
+				// Reversed cards (2+ templates): generate one TriviaCard per template direction
+				// Use a distinct modelId per template so reversed cards get their own answer pool
+				const fields = card.getFields();
+				const fieldNames = model.getFields().map(f => f.name);
+				const fieldValues = fieldNames.map(name => fields[name] ?? '');
+
+				// Template 0: forward (front → back), Template 1: reversed (back → front)
+				for (const template of templates) {
+					const templateModelId = `${modelId}:${template.ord}`;
+					const questionFieldIndex = template.ord === 0 ? 0 : 1;
+					const answerFieldIndex = template.ord === 0 ? 1 : 0;
+					const rawQuestion = fieldValues[questionFieldIndex] ?? '';
+					const rawAnswer = fieldValues[answerFieldIndex] ?? '';
+
+					if (hasImage(rawQuestion) || hasImage(rawAnswer)) {
+						continue;
+					}
+
+					const question = sanitizeCardText(rawQuestion);
+					const answer = sanitizeCardText(rawAnswer);
+					if (question && answer) {
+						loadedCards.push({question, answer, modelId: templateModelId});
+					}
+				}
+			} else {
+				// Basic (single template): front → question, back → answer
+				const rawFront = card.getFront();
+				const rawBack = card.getBack();
+
+				if (hasImage(rawFront) || hasImage(rawBack)) {
+					continue;
+				}
+
+				const question = sanitizeCardText(rawFront);
+				const answer = sanitizeCardText(rawBack);
+				if (question && answer) {
+					loadedCards.push({question, answer, modelId});
+				}
+			}
 		}
 	}
 
@@ -239,6 +356,25 @@ async function loadTriviaCardsFromApkg(): Promise<TriviaCard[]> {
 	}
 
 	return loadedCards;
+}
+
+function buildAnswerPools(cards: TriviaCard[]): Map<string, string[]> {
+	const pools = new Map<string, string[]>();
+	for (const card of cards) {
+		const existing = pools.get(card.modelId);
+		if (existing) {
+			existing.push(card.answer);
+		} else {
+			pools.set(card.modelId, [card.answer]);
+		}
+	}
+
+	// De-duplicate each pool
+	for (const [modelId, answers] of pools) {
+		pools.set(modelId, uniqueNonEmpty(answers));
+	}
+
+	return pools;
 }
 
 function setWaitingState(message: string) {
@@ -275,10 +411,20 @@ function broadcastScoreboard() {
 	io.emit('scoreboard', rows);
 }
 
-function getWrongAnswers(correctAnswer: string, count: number): string[] {
-	const answerPool = uniqueNonEmpty(triviaCards.map(card => card.answer));
-	const candidates = shuffle(answerPool.filter(answer => answer !== correctAnswer));
-	const wrongAnswers = candidates.slice(0, count);
+function getWrongAnswers(correctAnswer: string, modelId: string, count: number): string[] {
+	// Prefer answers from the same model group for thematic consistency
+	const modelPool = answerPoolByModel.get(modelId) ?? [];
+	const modelCandidates = shuffle(modelPool.filter(answer => answer !== correctAnswer));
+	const wrongAnswers = modelCandidates.slice(0, count);
+
+	// Fall back to global pool if we don't have enough from this model
+	if (wrongAnswers.length < count) {
+		const globalPool = uniqueNonEmpty(triviaCards.map(card => card.answer));
+		const globalCandidates = shuffle(globalPool.filter(
+			answer => answer !== correctAnswer && !wrongAnswers.includes(answer),
+		));
+		wrongAnswers.push(...globalCandidates.slice(0, count - wrongAnswers.length));
+	}
 
 	while (wrongAnswers.length < count) {
 		wrongAnswers.push(`Wrong answer ${wrongAnswers.length + 1}`);
@@ -714,6 +860,7 @@ function restartGame() {
 	roundState.round = 0;
 
 	triviaCards = shuffle(triviaCards);
+	answerPoolByModel = buildAnswerPools(triviaCards);
 	triviaCursor = 0;
 
 	obstacles.clear();
@@ -757,7 +904,7 @@ function startQuestionRound() {
 	triviaCursor++;
 	currentCorrectAnswer = card.answer;
 
-	const answers = shuffle([card.answer, ...getWrongAnswers(card.answer, 3)]);
+	const answers = shuffle([card.answer, ...getWrongAnswers(card.answer, card.modelId, 3)]);
 	const zones = randomAnswerZones(answers);
 
 	roundState = {
@@ -1210,6 +1357,7 @@ setInterval(tickRoundLoop, roundTickMs);
 async function bootstrap() {
 	try {
 		triviaCards = await loadTriviaCardsFromApkg();
+		answerPoolByModel = buildAnswerPools(triviaCards);
 		console.log(`Loaded ${triviaCards.length} trivia cards from questions.apkg`);
 		setWaitingState('Waiting for players...');
 	} catch (error) {
