@@ -20,6 +20,7 @@ camera.position.set(0, 12, 14);
 camera.lookAt(0, 0, 0);
 
 const renderer = new THREE.WebGLRenderer({antialias: true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -278,6 +279,8 @@ if (isMobile) {
 		color: 'rgba(255, 255, 255, 0.35)',
 		size: 120,
 		restOpacity: 0.6,
+		maxNumberOfJoysticks: 1,
+		multitouch: false,
 	});
 
 	joystick.on('move', (event_: {data: {vector?: {x: number; y: number}; force: number}}) => {
@@ -1056,9 +1059,12 @@ function getSupportHeightAtPosition(x: number, z: number, y: number, velocityY: 
 }
 
 function createTextSprite(text: string): THREE.Sprite {
+	const dpr = Math.min(window.devicePixelRatio || 1, 3);
+	const baseW = 1024;
+	const baseH = 512;
 	const canvas = document.createElement('canvas');
-	canvas.width = 512;
-	canvas.height = 256;
+	canvas.width = baseW * dpr;
+	canvas.height = baseH * dpr;
 	const context = canvas.getContext('2d');
 	if (!context) {
 		const fallback = new THREE.Sprite(new THREE.SpriteMaterial({color: 0xFF_FF_FF}));
@@ -1066,18 +1072,19 @@ function createTextSprite(text: string): THREE.Sprite {
 		return fallback;
 	}
 
-	context.clearRect(0, 0, canvas.width, canvas.height);
+	context.scale(dpr, dpr);
+	context.clearRect(0, 0, baseW, baseH);
 	context.fillStyle = 'rgba(0, 0, 0, 0.62)';
-	context.fillRect(6, 16, canvas.width - 12, canvas.height - 32);
+	context.fillRect(12, 24, baseW - 24, baseH - 48);
 	context.strokeStyle = 'rgba(255, 255, 255, 0.75)';
-	context.lineWidth = 3;
-	context.strokeRect(6, 16, canvas.width - 12, canvas.height - 32);
+	context.lineWidth = 4;
+	context.strokeRect(12, 24, baseW - 24, baseH - 48);
 	context.fillStyle = '#ffffff';
-	context.font = '700 30px Trebuchet MS';
+	context.font = '700 52px Trebuchet MS';
 	context.textAlign = 'center';
 	context.textBaseline = 'top';
 
-	const maxTextWidth = canvas.width - 34;
+	const maxTextWidth = baseW - 60;
 	const words = text.split(/\s+/).filter(Boolean);
 	const lines: string[] = [];
 	let currentLine = '';
@@ -1105,15 +1112,18 @@ function createTextSprite(text: string): THREE.Sprite {
 		visibleLines[maxLines - 1] = `${visibleLines[maxLines - 1]}...`;
 	}
 
-	const lineHeight = 38;
+	const lineHeight = 64;
 	const contentHeight = visibleLines.length * lineHeight;
-	let y = Math.max(28, (canvas.height - contentHeight) / 2);
+	let y = Math.max(40, (baseH - contentHeight) / 2);
 	for (const line of visibleLines) {
-		context.fillText(line, canvas.width / 2, y);
+		context.fillText(line, baseW / 2, y);
 		y += lineHeight;
 	}
 
 	const texture = new THREE.CanvasTexture(canvas);
+	texture.generateMipmaps = false;
+	texture.minFilter = THREE.LinearFilter;
+	texture.magFilter = THREE.LinearFilter;
 	texture.needsUpdate = true;
 	const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
 		map: texture,
