@@ -204,6 +204,7 @@ hostDecisionText.style.margin = '0';
 hostDecisionText.style.opacity = '0.92';
 hostDecisionText.style.fontFamily = '"Trebuchet MS", Verdana, sans-serif';
 hostDecisionText.style.fontSize = '1rem';
+hostDecisionText.style.whiteSpace = 'pre-line';
 
 const hostDecisionButtons = document.createElement('div');
 hostDecisionButtons.style.display = 'grid';
@@ -517,7 +518,7 @@ function spawnLightningBolt(targetWorldPosition: THREE.Vector3) {
 function showHostDecisionDialog() {
 	hostDecisionTitle.textContent = currentHostPromptIsInitialStart ? 'Start Game?' : 'Play Again?';
 	hostDecisionText.textContent = currentHostPromptIsInitialStart
-		? 'Click once all players have joined'
+		? `Lobby Code: ${lobbyCode}\nClick once all players have joined`
 		: 'The game has ended. Start another round?';
 	if (!hostDecisionDialog.open) {
 		hostDecisionDialog.showModal();
@@ -1251,9 +1252,9 @@ function applyRoundState(roundState: RoundState) {
 			roundTimer.textContent = currentHostPromptIsInitialStart ? 'Ready' : 'Game Over';
 			roundQuestion.textContent = isLocalHost
 				? (currentHostPromptIsInitialStart
-					? 'Click Start when everyone has joined.'
+					? `Lobby: ${lobbyCode} — Click Start when everyone has joined.`
 					: 'Choose if you want to play again.')
-				: 'Waiting for host';
+				: `Lobby: ${lobbyCode} — Waiting for host`;
 
 			break;
 		}
@@ -1461,6 +1462,7 @@ function updateRemotePlayer(data: RemotePlayerData) {
 	}
 }
 
+const lobbyCode = globalThis.location.pathname.split('/').filter(Boolean).pop() ?? '';
 const gamePlayerId = new URLSearchParams(globalThis.location.search).get('gamePlayerId') ?? '';
 connect({
 	onInit(payload) {
