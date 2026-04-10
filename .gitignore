@@ -6,3 +6,5 @@ dist-server/
 node_modules/
 /models/**
 *.db
+poster/
+!poster/poster.ai
