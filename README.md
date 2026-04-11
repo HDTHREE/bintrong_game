@@ -19,7 +19,7 @@ Austin Coontz | coontz.austin@gmail.com | TrustedSec
 
 # Table of Contents
 1 [Project descrption](project_description.md)
-* Design
+* User Interface Specification
   * [User Stories](user_stories.md)
   * [D0](design_diagrams/design_D0.md)
   * [D1](design_diagrams/design_D1.md)
@@ -28,16 +28,23 @@ Austin Coontz | coontz.austin@gmail.com | TrustedSec
   * [Task list](tasklist.md)
   * [Milestones & effort matrix](milestones.md)
   * [Results](results.md)
+* [User Manual](source.md)
+* [Presentation](design_presentation.pptx)
 * [Constraints and Concerns](constraints.md)
   * Economic
   * Security
   * Legal
+* [Poster](poster/poster.pdf)
 * [Design presentation](https://github.com/HDTHREE/bintrong_game/raw/refs/heads/master/design_presentation.pptx)
 * [Self assessment essay](https://github.com/HDTHREE/bintrong_game/raw/refs/heads/master/capstone_assessment.docx)
+* [End of term assessment essay](https://github.com/HDTHREE/bintrong_game/raw/refs/heads/master/hdennis_reflection_CSCP2.docx)
+* [Hours & Justification](hours.md)
+* [Expenses](expenses.md)
 * [Biography](biography.md)
 * Budget
   * Necessary costs are discussed in detail in the constraints document. However, as of date, there have been no expences.
 * Appendix
+  * I have no meeting notes because I am an insane person who talks to myself.
   * [Repo](https://github.com/HDTHREE/bintrong_game)
   * Technologies:
     * [docker](https://www.docker.com/)
