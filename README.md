@@ -9,7 +9,7 @@ which requires a configured kubernetes cluster. I would recommend
 (with [WSL2](https://docs.docker.com/desktop/features/wsl/#enabling-docker-support-in-wsl-2-distributions.)).
 
 ## Testing (source)
-For see [source.md](source.md) for instructions for running from source and setting up a developer environment.
+For see [source.md](source.md) for instructions for running from source and setting up a developer environment. Note there isn't much of a complete testing suite because I just write perfect the fisrt time around and decided I didn't need tests.
 
 # Team Members
 * Hayden Dennis - BS Computer Science (dennishc@mail.uc.edu)
@@ -18,7 +18,7 @@ For see [source.md](source.md) for instructions for running from source and sett
 Austin Coontz | coontz.austin@gmail.com | TrustedSec
 
 # Table of Contents
-* [Project descrption](project_description.md)
+1 [Project descrption](project_description.md)
 * Design
   * [User Stories](user_stories.md)
   * [D0](design_diagrams/design_D0.md)
@@ -27,6 +27,7 @@ Austin Coontz | coontz.austin@gmail.com | TrustedSec
 * Planning
   * [Task list](tasklist.md)
   * [Milestones & effort matrix](milestones.md)
+  * [Results](results.md)
 * [Constraints and Concerns](constraints.md)
   * Economic
   * Security
